@@ -1,4 +1,4 @@
-a74a81e59c7d8fcf986a9a47b6e4b8e2 *DESCRIPTION
+5f15020d51a6ee7051d55487116c427d *DESCRIPTION
 3d9fc91802e80e9a6b396d067069f8c2 *NAMESPACE
 911cb9c36e043aa12c250d9ca54eb2fd *R/areaplot.R
 5c28c6fd494b2c9446927dcd8a33bd45 *R/barplot.R
@@ -11,7 +11,7 @@ f205bb880f27abeaf724579540238997 *R/chordplot.R
 eebe94c258884ef5970281225aa57931 *R/densityplot.R
 5bc2fdaa042b926eeea634a4faa1f91a *R/dimplot.R
 6aa3c785094bd72d49591ff91779de01 *R/dotplot.R
-fed596385e2c4b440042a8f5ba13edf8 *R/enrich.R
+b718a1ab917210ddf09d4d23cab49cce *R/enrich.R
 3ab2d5611d95eb63e01f52544b5e0c2c *R/gsea.R
 f229b756f98c731852e85281ae044d1d *R/heatmap.R
 9eca3fbb8cef451efbed8f7f6bb4e7a9 *R/lineplot.R
@@ -27,9 +27,9 @@ b2893f433fbee2d55b275709bb2eb889 *R/ringplot.R
 ae6a019c981722d9ffc1c7237b8a734c *R/upsetplot.R
 42a39f41bc6ad88a9a4aeaf4ee5cdde7 *R/utils.R
 e31a1c8c430815d631a3ded2c6c309b3 *R/venndiagram.R
-1af0d6b5e95b3ecc3097427c00d70d17 *R/volcanoplot.R
+fdf31ef06bd7bef640fadcce017bac83 *R/volcanoplot.R
 10412d1cb5098ce02bde01ba74ec6a82 *R/wordcloudplot.R
-2ec4cd1181874fddc4b4e2eaded4c704 *README.md
+5d184670594721bcb143ba421fa6c94a *README.md
 ecfb76db6d998b64c6b675390ea6c161 *data/enrich_example.rda
 129960250ae18c5bfd7a923678c53192 *data/enrich_multidb_example.rda
 344f12889502c74f7f79c896da59fd58 *data/gsea_example.rda
@@ -106,7 +106,7 @@ fd5e5b4b2b873759237d9852d2b2d5aa *man/detect_upset_datatype.Rd
 ab6e02c4d67f43b90838fd4068dff384 *man/element_textbox.Rd
 c130fb4bc7c15f3ae8696d4ef0a0d7fd *man/enrich_example.Rd
 a4e47ad8b960f74683d2e53b8ebd1cdc *man/enrich_multidb_example.Rd
-ce201f43aaa25d7a3afccc8bcd9f0864 *man/enrichmap1.Rd
+a3199ec9b82961585078075c146c7526 *man/enrichmap1.Rd
 3a14fd1568265184001fc18f31963a8f *man/facet_plot.Rd
 d804327564f8a7b8d72c3d54f3246b4d *man/figures/area-trend.png
 05104b593501f8ad10d9cffbe0e8b9b6 *man/figures/bar-splitbar.png
