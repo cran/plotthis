@@ -9,6 +9,7 @@ BarPlotAtomic(
   x,
   x_sep = "_",
   y = NULL,
+  scale_y = FALSE,
   flip = FALSE,
   group_by = NULL,
   group_by_sep = "_",
@@ -71,6 +72,9 @@ BarPlotAtomic(
 
 \item{y}{A character string specifying the column name of the data frame to plot for the y-axis.}
 
+\item{scale_y}{A logical value indicating whether to scale the total y values in each group to 100\%.
+Only works when group_by is specified.}
+
 \item{flip}{A logical value indicating whether to flip the x and y axes.}
 
 \item{group_by}{Columns to group the data for plotting
@@ -109,9 +113,12 @@ Default is "theme_this".}
 
 \item{theme_args}{A list of arguments to pass to the theme function.}
 
-\item{palette}{A character string specifying the palette to use.}
+\item{palette}{A character string specifying the palette to use.
+A named list or vector can be used to specify the palettes for different \code{split_by} values.}
 
-\item{palcolor}{A character string specifying the color to use in the palette.}
+\item{palcolor}{A character string specifying the color to use in the palette.
+A named list can be used to specify the colors for different \code{split_by} values.
+If some values are missing, the values from the palette will be used (palcolor will be NULL for those values).}
 
 \item{alpha}{A numeric value specifying the transparency of the plot.}
 

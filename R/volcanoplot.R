@@ -94,8 +94,7 @@ VolcanoPlotAtomic <- function(
     if (is.null(color_by)) {
         color_by <- ".category"
         color_type <- "discrete"
-    } else if (is.null(color_by)) {
-        color_by <- ".category"
+    } else if (is.character(data[[color_by]]) || is.factor(data[[color_by]])) {
         color_type <- "discrete"
     } else {
         color_type <- "continuous"
@@ -204,7 +203,7 @@ VolcanoPlotAtomic <- function(
                 data = vline_df,
                 mapping = aes(
                     xintercept = !!sym("xintercept"),
-                    color = x_cutoff_name %||% paste0(x, " = +/-", scales::number(x_cutoff))),
+                    color = x_cutoff_name %||% paste0(x, " = +/-", scales::number(x_cutoff, accuracy = 0.01))),
                 alpha = 0.4, linetype = x_cutoff_linetype, size = x_cutoff_linewidth,
             ) +
             scale_color_manual(name = NULL, values = x_cutoff_color, guide = guide)
@@ -363,6 +362,9 @@ VolcanoPlotAtomic <- function(
 #' VolcanoPlot(data, x = "avg_log2FC", y = "p_val_adj", y_cutoff_name = "none",
 #'    highlight = c("ANXA2", "TMEM40", "PF4", "GNG11", "CLU", "CD9", "FGFBP2",
 #'    "TNFRSF1B", "IFI6"))
+#' VolcanoPlot(data, x = "avg_log2FC", y = "p_val_adj", color_by = "pct_diff",
+#'    y_cutoff_name = "-log10(0.05)", split_by = "group",
+#'    palette = c(A = "Set1", B = "Dark2"))
 #' }
 VolcanoPlot <- function(
     data, x, y, ytrans = function(n) -log10(n), color_by = NULL, color_name = NULL,
@@ -391,6 +393,8 @@ VolcanoPlot <- function(
         datas <- list(data)
         names(datas) <- "..."
     }
+    palette <- check_palette(palette, names(datas))
+    palcolor <- check_palcolor(palcolor, names(datas))
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -409,7 +413,7 @@ VolcanoPlot <- function(
                 label_bg_r = label_bg_r, highlight = highlight, highlight_color = highlight_color, highlight_size = highlight_size, highlight_alpha = highlight_alpha,
                 highlight_stroke = highlight_stroke,
                 facet_by = facet_by, facet_scales = facet_scales, facet_ncol = facet_ncol, facet_nrow = facet_nrow, facet_byrow = facet_byrow,
-                theme = theme, theme_args = theme_args, palette = palette, palcolor = palcolor,
+                theme = theme, theme_args = theme_args, palette = palette[[nm]], palcolor = palcolor[[nm]],
                 title = title, subtitle = subtitle, xlab = xlab, ylab = ylab,
                 aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction, seed = seed, ...
             )

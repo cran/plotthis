@@ -1,4 +1,4 @@
-# plotthis <a href="https://pwwang.github.io/plotthis/"><img src="man/figures/logo.png" align="right" height="120" alt="plotthis website" /></a>
+# plotthis <a href="https://pwwang.github.io/plotthis/"><img src="man/figures/logo.png" align="right" height="180" alt="plotthis website" /></a>
 
 `plotthis` is an R package that is built upon `ggplot2` and other plotting packages. It provides high-level APIs and a wide range of options to create stunning, publication-quality plots effortlessly.
 
@@ -22,11 +22,11 @@ $ conda install pwwang::r-plotthis
 `plotthis` is greatly inspired by the [`SCP`][1] package, but with the plotting functions detached from the Seurat object or single-cell data analysis. It is designed to be more flexible and general-purpose, and can be used for a wide range of data types and analysis scenarios.
 
 ## Gallery
-[`AreaPlot`][2] / [`TrendPlot`][3]
+[`AreaPlot`][2] / [`TrendPlot`][3] / [`ROCCurve`][28]
 
 ![area-trend](man/figures/area-trend.png)
 
-[`ClustreePlot`][4] / [`LinePlot`][5] / [`Network`][26]
+[`ClustreePlot`][4] / [`LinePlot`][5] / [`Network`][27]
 
 ![clustree-line](man/figures/clustree-line.png)
 
@@ -112,5 +112,6 @@ $ conda install pwwang::r-plotthis
 [23]: https://pwwang.github.io/plotthis/reference/RidgePlot.html
 [24]: https://pwwang.github.io/plotthis/reference/CorPlot.html
 [25]: https://pwwang.github.io/plotthis/reference/CorPairsPlot.html
-[25]: https://pwwang.github.io/plotthis/reference/RarefactionPlot.html
-[26]: https://pwwang.github.io/plotthis/reference/Network.html
+[26]: https://pwwang.github.io/plotthis/reference/RarefactionPlot.html
+[27]: https://pwwang.github.io/plotthis/reference/Network.html
+[28]: https://pwwang.github.io/plotthis/reference/ROCCurve.html

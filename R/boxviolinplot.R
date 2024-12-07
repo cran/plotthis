@@ -57,6 +57,7 @@
 #' @param highlight_size A numeric value to specify the size of the highlighted points.
 #' @param highlight_alpha A numeric value to specify the transparency of the highlighted points.
 #' @param comparisons A logical value or a list of vectors to perform pairwise comparisons.
+#' If `TRUE`, it will perform pairwise comparisons for all pairs.
 #' @param ref_group A character string to specify the reference group for comparisons.
 #' @param pairwise_method A character string to specify the pairwise comparison method.
 #' @param multiplegroup_comparisons A logical value to perform multiple group comparisons.
@@ -65,6 +66,7 @@
 #' @param sig_labelsize A numeric value to specify the size of the significance test label.
 #' @return A ggplot object
 #' @keywords internal
+#' @importFrom utils combn
 #' @importFrom stats median quantile
 #' @importFrom rlang sym syms parse_expr
 #' @importFrom dplyr mutate ungroup first
@@ -114,7 +116,8 @@ BoxViolinPlotAtomic <- function(
     )
     facet_by <- check_columns(data, facet_by, force_factor = TRUE, allow_multi = TRUE)
     if (isTRUE(comparisons) && is.null(group_by)) {
-        stop("'group_by' must be provided to when 'comparisons' is TRUE.")
+        # stop("'group_by' must be provided to when 'comparisons' is TRUE.")
+        comparisons <- combn(levels(data[[x]]), 2, simplify = FALSE)
     }
     if (isTRUE(multiplegroup_comparisons) || length(comparisons) > 0) {
         # if (!requireNamespace("ggpubr", quietly = TRUE)) {
@@ -528,6 +531,9 @@ BoxViolinPlot <- function(
         names(datas) <- "..."
     }
 
+    palette <- check_palette(palette, names(datas))
+    palcolor <- check_palcolor(palcolor, names(datas))
+
     stat_name <- stat_name %||% paste0(y, " (", deparse(substitute(add_stat)), ")")
 
     plots <- lapply(
@@ -542,7 +548,7 @@ BoxViolinPlot <- function(
                 x = x, x_sep = x_sep, y = y, base = base, in_form = in_form,
                 sort_x = sort_x, flip = flip, keep_empty = keep_empty, group_by = group_by, group_by_sep = group_by_sep, group_name = group_name,
                 x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse,
-                theme = theme, theme_args = theme_args, palette = palette, palcolor = palcolor, alpha = alpha,
+                theme = theme, theme_args = theme_args, palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha,
                 aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction,
                 add_point = add_point, pt_color = pt_color, pt_size = pt_size, pt_alpha = pt_alpha,
                 jitter_width = jitter_width, jitter_height = jitter_height, stack = stack, y_max = y_max, y_min = y_min,
@@ -590,6 +596,12 @@ BoxViolinPlot <- function(
 #'     x = "x", y = "y",
 #'     stack = TRUE, flip = TRUE, facet_by = "group1",
 #'     add_bg = TRUE, bg_palette = "Paired"
+#' )
+#' BoxPlot(data,
+#'     x = "x", y = "y",
+#'     stack = TRUE, flip = TRUE, split_by = "group1",
+#'     add_bg = TRUE, bg_palette = "Paired",
+#'     palcolor = list(g1 = c("red", "blue"), g2 = c("blue", "red"))
 #' )
 #'
 #' # wide form data
@@ -675,6 +687,10 @@ BoxPlot <- function(
 #' ViolinPlot(data,
 #'     x = "x", y = "y", fill_mode = "mean",
 #'     facet_by = "group2", palette = "Blues"
+#' )
+#' ViolinPlot(data,
+#'     x = "x", y = "y", fill_mode = "mean",
+#'     split_by = "group1", palette = c(g1 = "Blues", g2 = "Reds")
 #' )
 #' ViolinPlot(data,
 #'     x = "x", y = "y", stack = TRUE,

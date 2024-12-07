@@ -26,12 +26,15 @@ Heatmap(
   pie_name = NULL,
   pie_size_name = "size",
   pie_values = "count",
+  legend_items = NULL,
+  legend_discrete = FALSE,
   lower_quantile = 0,
   upper_quantile = 0.99,
   lower_cutoff = NULL,
   upper_cutoff = NULL,
   columns_by_sep = "_",
   columns_split_by = NULL,
+  columns_split_name = NULL,
   columns_palette = "Paired",
   columns_palcolor = NULL,
   columns_split_by_sep = "_",
@@ -43,7 +46,9 @@ Heatmap(
   rows_split_palette = "simspec",
   rows_split_palcolor = NULL,
   column_name_annotation = TRUE,
+  column_name_legend = isFALSE(show_column_names) && !identical(legend.position, "none"),
   row_name_annotation = TRUE,
+  row_name_legend = isFALSE(show_row_names) && !identical(legend.position, "none"),
   cluster_columns = TRUE,
   cluster_rows = TRUE,
   show_row_names = !row_name_annotation,
@@ -163,6 +168,11 @@ If not, the sum of the values will be used and a warning will be shown.
 group in \code{pie_group_by}.
 }}
 
+\item{legend_items}{A numeric vector with names to specifiy the items in the main legend.
+The names will be working as the labels of the legend items.}
+
+\item{legend_discrete}{A logical value indicating whether the main legend is discrete.}
+
 \item{lower_quantile, upper_quantile, lower_cutoff, upper_cutoff}{Vector of minimum and maximum cutoff values or quantile values for each feature.
 It's applied to aggregated values when aggregated values are used (e.g. plot_type tile, label, etc).
 It's applied to raw values when raw values are used (e.g. plot_type bars, etc).}
@@ -171,6 +181,8 @@ It's applied to raw values when raw values are used (e.g. plot_type bars, etc).}
 
 \item{columns_split_by}{A character string of the column name to split the heatmap columns into slices.
 A character/factor column or multiple columns are expected.}
+
+\item{columns_split_name}{A character string specifying the name of the column split annotation.}
 
 \item{columns_palette}{A character string specifying the palette of the column group annotation.
 The default is "Paired".}
@@ -200,8 +212,12 @@ The default is "simspec".}
 \item{column_name_annotation}{A logical value indicating whether to add the column annotation for the column names.
 which is a simple annotaion indicating the column names.}
 
+\item{column_name_legend}{A logical value indicating whether to show the legend of the column name annotation.}
+
 \item{row_name_annotation}{A logical value indicating whether to add the row annotation for the row names.
 which is a simple annotaion indicating the row names.}
+
+\item{row_name_legend}{A logical value indicating whether to show the legend of the row name annotation.}
 
 \item{cluster_columns}{A logical value indicating whether to cluster the columns.
 If TRUE and columns_split_by is provided, the clustering will only be applied to the columns within the same split.}
@@ -316,9 +332,12 @@ Could be a list with the keys as the names of the annotation and the values as t
 
 \item{reticle_color}{A character string specifying the color of the reticle.}
 
-\item{palette}{A character string specifying the palette to use.}
+\item{palette}{A character string specifying the palette to use.
+A named list or vector can be used to specify the palettes for different \code{split_by} values.}
 
-\item{palcolor}{A character string specifying the color to use in the palette.}
+\item{palcolor}{A character string specifying the color to use in the palette.
+A named list can be used to specify the colors for different \code{split_by} values.
+If some values are missing, the values from the palette will be used (palcolor will be NULL for those values).}
 
 \item{alpha}{A numeric value specifying the transparency of the plot.}
 
@@ -435,6 +454,8 @@ Heatmap(data, rows = rows, columns_by = "c", rows_data = rows_data,
   row_annotation_type = list(rp = "pie", rv = "density", rows1 = "simple"),
   row_annotation_params = list(rp = list(width = grid::unit(12, "mm"))),
   show_row_names = TRUE, show_column_names = TRUE, flip = TRUE)
+Heatmap(data, rows = rows, columns_by = "c", split_by = "p",
+        palette = list(X = "Reds", Y = "Blues", Z = "Purp"))
 }
 }
 \seealso{
