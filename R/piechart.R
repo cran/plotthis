@@ -2,6 +2,7 @@
 #'
 #' @inheritParams common_args
 #' @param label Which column to use as the label. NULL means no label.
+#' Default is the same as y. If y is NULL, you should use ".y" to specify the count as the label.
 #' @param y A character string of the column name to plot on the y-axis.
 #'   A numeric column is expected.
 #'   If NULL, the count of each x column will be used.
@@ -74,9 +75,6 @@ PieChartAtomic <- function(
         pos_df <- .pos_df_one_facet(data)
     } else {
         pos_df <- do.call(rbind, lapply(split(data, data[[concated_facet_by]]), .pos_df_one_facet))
-    }
-    if (!is.null(label)) {
-        pos_df[[label]] <- data[[label]]
     }
     if (isTRUE(clockwise)) {
         colors <- palette_this(rev(levels(data[[x]])), palette = palette, palcolor = palcolor)
@@ -156,6 +154,8 @@ PieChartAtomic <- function(
 #'
 #' # y from count
 #' PieChart(data, x = "group")
+#' # add label
+#' PieChart(data, x = "group", label = ".y")
 PieChart <- function(
     data, x, y = NULL, label = y, split_by = NULL, split_by_sep = "_", clockwise = TRUE,
     facet_by = NULL, facet_scales = "free_y", facet_ncol = NULL, facet_nrow = NULL, facet_byrow = TRUE,
