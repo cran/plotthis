@@ -1,5 +1,5 @@
-a47d9870c332dfebc07bbd5e0636e547 *DESCRIPTION
-928ef9d7fd5efc6bd7fae5c63d8c5bd6 *NAMESPACE
+455b1f55474e9cb649903c8721da02be *DESCRIPTION
+c535261fcfe7faf903bcb05e1c4fcd83 *NAMESPACE
 fbfc0d1ac96e16bd9b94e11b34b76ed4 *R/areaplot.R
 21446f316da042e7af222cf6c87f67b9 *R/barplot.R
 304fa0f2361e7f87522ef6f00a1abca0 *R/boxviolinplot.R
@@ -13,7 +13,7 @@ becabd0b1c3a977cda3e977f34e4da1b *R/densityplot.R
 ea75be3cd8e6d6118989be70464940e2 *R/dotplot.R
 0f940336308a548c62f938443f785ac6 *R/enrich.R
 3ab2d5611d95eb63e01f52544b5e0c2c *R/gsea.R
-acb948d77e4d072ed36680fc3078f973 *R/heatmap.R
+b9bf2ea61a9b19e5aaa4938f5c5ac753 *R/heatmap.R
 b88d6382bd4ebe9497c4da806c110a44 *R/lineplot.R
 17d0fbb8335490847af720b39c83aed4 *R/network.R
 53bea6847dc3325d0f70bf8f7fe22455 *R/piechart.R
@@ -21,16 +21,16 @@ e9d17a5f1bc40ff44ead8281848f88d4 *R/radarplot.R
 4f75855ce1d6b051d1ecf0e038c04518 *R/rarefractionplot.R
 f66ea53e2c86a36bad2489c339cfae2c *R/ringplot.R
 39b59a4f2cda8dad62baba1738749713 *R/roccurve.R
-d5bfbf4a3f36cc1e810777f75e05570e *R/sankeyplot.R
+5ead647e0eb072312ace2c3f26bc7f05 *R/sankeyplot.R
 6af2abfea519e7d70965fee701bb73e2 *R/scatterplot.R
 884353278ac0b35dcdfd9df9efc25668 *R/theming.R
 c8e3da41939c8fc0c584a90a47d11e8f *R/trendplot.R
 f21e6b7ecc90d8d251c8aa177b1a043e *R/upsetplot.R
 5bb312252deb60f6ff6357d992c2f015 *R/utils.R
 ebaff1144e706f203bdb6b68fd049bee *R/venndiagram.R
-8b7965691e8d846fc48901b432f00fbf *R/volcanoplot.R
+4c019ee3b327ea86069340c3693a9dd4 *R/volcanoplot.R
 f9793dc469822723c92244ad0162815a *R/wordcloudplot.R
-9c8405d5c55bd5ede426425d4356b19f *README.md
+efe60737dbda8e33a9b624dcfd3a4b42 *README.md
 ecfb76db6d998b64c6b675390ea6c161 *data/enrich_example.rda
 129960250ae18c5bfd7a923678c53192 *data/enrich_multidb_example.rda
 344f12889502c74f7f79c896da59fd58 *data/gsea_example.rda
@@ -75,7 +75,7 @@ aaf077ef6a67faef7e46822a6aa46256 *man/RarefactionPlotAtomic.Rd
 64a4403121df14c7f69c2f6bda891c7e *man/RidgePlotAtomic.Rd
 c17340cb2b89608f82743fec9e47ae1f *man/RingPlot.Rd
 fdcd2ba8969638d8047dc5b4d38f9d2a *man/RingPlotAtomic.Rd
-935a6c5a6b9e3bd0cade5e0bcdf9bd3d *man/SankeyPlotAtomic.Rd
+88b3fef6b0b35f5d95dc24916a7df4df *man/SankeyPlotAtomic.Rd
 0efe2b63fdd83da8633c40b8713ad585 *man/ScatterPlot.Rd
 74af21cb7a2a3049833223b4d1b6607c *man/ScatterPlotAtomic.Rd
 746ae62f7d6bc20cc3bb9a8ce46a5941 *man/SplitBarPlotAtomic.Rd
@@ -83,8 +83,8 @@ c0078af404368da3a25c5121311c7d8d *man/TrendPlot.Rd
 63131e07ce71e317ddc013fb116ca34c *man/TrendPlotAtomic.Rd
 ab0de269aebdccdc7dccd0fa8f7182cb *man/UpsetPlotAtomic.Rd
 7975c5c65bdc8d22512155bb76828bd4 *man/VennDiagramAtomic.Rd
-b1af170506d16f67af6bf76e2202681a *man/VolcanoPlot.Rd
-9d9ed05197764ebecdbdfd2c5d0f88bb *man/VolcanoPlotAtomic.Rd
+d2aeed5a4de2e232dec0c0e2e65dd8f3 *man/VolcanoPlot.Rd
+e97fcfbd31f67e66f4fd91dcb8b11cac *man/VolcanoPlotAtomic.Rd
 1c67f32ea72886317e7220cc421bba47 *man/WordCloudPlot.Rd
 423fee9b3db8fedad9e359ef1dd5964a *man/WordCloudPlotAtomic.Rd
 b9d3c789572e127a644641a156ed9250 *man/adjcolors.Rd
@@ -143,7 +143,7 @@ de1466642f64db6f35b04bff994d176e *man/palette_list.Rd
 04bfa1c424bebfc03fbd6fb422f7cd33 *man/process_theme.Rd
 2b8abc33d9225e4657b3e7a9b8e77c8b *man/radarplot.Rd
 54a4d2ae7cae35258572816de8a78b85 *man/rgba_to_rgb.Rd
-b9e60b17202e7c56888a35c06bee15ab *man/sankeyplot.Rd
+20f807f68f6cd05d1a5b8c0873169105 *man/sankeyplot.Rd
 83f2c86b26f7d0089d8914a5f266df9e *man/show_palettes.Rd
 8b51a01a722bd20276fc10d23ecd4098 *man/theme_blank.Rd
 94542802a4137b9e6c56be58ea46e978 *man/theme_this.Rd

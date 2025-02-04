@@ -6,12 +6,13 @@
 \usage{
 SankeyPlotAtomic(
   data,
+  in_form = c("auto", "long", "lodes", "wide", "alluvia", "counts"),
   x,
   x_sep = "_",
   y = NULL,
   stratum = NULL,
   stratum_sep = "_",
-  alluvium,
+  alluvium = NULL,
   alluvium_sep = "_",
   flow = FALSE,
   nodes_color = "grey30",
@@ -52,27 +53,26 @@ SankeyPlotAtomic(
 )
 }
 \arguments{
-\item{data}{A data frame in either long (lodes) format.
-If your data is in wide (alluvia) format, you can use \link[ggalluvial:alluvial-data]{ggalluvial::to_lodes_form} to convert it.}
+\item{data}{A data frame.}
+
+\item{in_form}{A character string to specify the format of the data.
+Possible values are "auto", "long", "lodes", "wide", "alluvia", and "counts".}
 
 \item{x}{A character string of the column name to plot on the x-axis.
-Works as aes \code{x} in \link[ggalluvial:geom_alluvium]{ggalluvial::geom_alluvium} or \link[ggalluvial:geom_flow]{ggalluvial::geom_flow}.}
+See \code{data} for more details.}
 
 \item{x_sep}{A character string to concatenate the columns in \code{x}, if multiple columns are provided.}
 
 \item{y}{A character string of the column name to plot on the y-axis.
-Works as aes \code{y} in \link[ggalluvial:geom_alluvium]{ggalluvial::geom_alluvium} or \link[ggalluvial:geom_flow]{ggalluvial::geom_flow}.
-If not provided, the number of observations for each \code{x}, \code{stratum}, and \code{alluvium} will be calculated.}
+When \code{in_form} is "counts", \code{y} will be ignored. Otherwise, it defaults to the count of each \code{x}, \code{stratum}, \code{alluvium} and \code{links_fill_by}.}
 
 \item{stratum}{A character string of the column name to group the nodes for each \code{x}.
-Works as aes \code{stratum} in \link[ggalluvial:geom_alluvium]{ggalluvial::geom_alluvium} or \link[ggalluvial:geom_flow]{ggalluvial::geom_flow}.
-If not provided, \code{links_fill_by} will be used if provided, otherwise, \code{alluvium} will be used.
-That is, the nodes for each \code{x} will be the same as \code{alluvium}.}
+See \code{data} for more details.}
 
 \item{stratum_sep}{A character string to concatenate the columns in \code{stratum}, if multiple columns are provided.}
 
 \item{alluvium}{A character string of the column name to define the links.
-Works as aes \code{alluvium} in \link[ggalluvial:geom_alluvium]{ggalluvial::geom_alluvium}.}
+See \code{data} for more details.}
 
 \item{alluvium_sep}{A character string to concatenate the columns in \code{alluvium}, if multiple columns are provided.}
 
@@ -81,9 +81,7 @@ Works as aes \code{alluvium} in \link[ggalluvial:geom_alluvium]{ggalluvial::geom
 \item{nodes_color}{A character string to color the nodes.
 Use a special value ".fill" to use the same color as the fill.}
 
-\item{links_fill_by}{A character string of the column name to fill the links.
-Works as aes \code{fill} in \link[ggalluvial:geom_alluvium]{ggalluvial::geom_alluvium} or \link[ggalluvial:geom_flow]{ggalluvial::geom_flow}.
-If not provided, \code{alluvium} will be used.}
+\item{links_fill_by}{A character string of the column name to fill the links.}
 
 \item{links_fill_by_sep}{A character string to concatenate the columns in \code{links_fill_by}, if multiple columns are provided.}
 
