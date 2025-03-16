@@ -1,5 +1,5 @@
-455b1f55474e9cb649903c8721da02be *DESCRIPTION
-c535261fcfe7faf903bcb05e1c4fcd83 *NAMESPACE
+8f0667bb88e5f28953887c88ac9bf5d6 *DESCRIPTION
+41e71a8d06b962a19aad998321632bf5 *NAMESPACE
 fbfc0d1ac96e16bd9b94e11b34b76ed4 *R/areaplot.R
 21446f316da042e7af222cf6c87f67b9 *R/barplot.R
 304fa0f2361e7f87522ef6f00a1abca0 *R/boxviolinplot.R
@@ -17,10 +17,11 @@ b9bf2ea61a9b19e5aaa4938f5c5ac753 *R/heatmap.R
 b88d6382bd4ebe9497c4da806c110a44 *R/lineplot.R
 17d0fbb8335490847af720b39c83aed4 *R/network.R
 53bea6847dc3325d0f70bf8f7fe22455 *R/piechart.R
+88a61da5616b92bad6821217e49daf9b *R/qqplot.R
 e9d17a5f1bc40ff44ead8281848f88d4 *R/radarplot.R
 4f75855ce1d6b051d1ecf0e038c04518 *R/rarefractionplot.R
 f66ea53e2c86a36bad2489c339cfae2c *R/ringplot.R
-39b59a4f2cda8dad62baba1738749713 *R/roccurve.R
+26cdecd70d401e00854eedc2982a72ce *R/roccurve.R
 5ead647e0eb072312ace2c3f26bc7f05 *R/sankeyplot.R
 6af2abfea519e7d70965fee701bb73e2 *R/scatterplot.R
 884353278ac0b35dcdfd9df9efc25668 *R/theming.R
@@ -30,7 +31,7 @@ f21e6b7ecc90d8d251c8aa177b1a043e *R/upsetplot.R
 ebaff1144e706f203bdb6b68fd049bee *R/venndiagram.R
 4c019ee3b327ea86069340c3693a9dd4 *R/volcanoplot.R
 f9793dc469822723c92244ad0162815a *R/wordcloudplot.R
-efe60737dbda8e33a9b624dcfd3a4b42 *README.md
+30810a814e7675e978d5f5d615ec91d6 *README.md
 ecfb76db6d998b64c6b675390ea6c161 *data/enrich_example.rda
 129960250ae18c5bfd7a923678c53192 *data/enrich_multidb_example.rda
 344f12889502c74f7f79c896da59fd58 *data/gsea_example.rda
@@ -66,7 +67,9 @@ a0e22c8cfa1be6eb903530755e5b8782 *man/LinePlot.Rd
 6074e3fcdd9a9987b5ffb3330d9c5720 *man/NetworkAtomic.Rd
 b7566c3116026d30e70079df26acdda1 *man/PieChart.Rd
 c1ca8faa561e7085780279af0c557af0 *man/PieChartAtomic.Rd
-749937ed4db654f8977ab467444ec098 *man/ROCCurve.Rd
+09979cb5881ec6f648b60eb093f2495f *man/QQPlot.Rd
+a2f1eb98efc4e1b1ab6d37f77eeb1f70 *man/QQPlotAtomic.Rd
+3b6b835e5fc88f5788924a0176b73f65 *man/ROCCurve.Rd
 8ae8f3497cc9604e7e8b6180dc6b4b72 *man/ROCCurveAtomic.Rd
 3a46dfe4503a068a9da27c7870fc01ae *man/RadarPlotAtomic.Rd
 19d7f9614fa414d227ba4b99aed30c84 *man/RarefactionPlot.Rd
@@ -126,7 +129,7 @@ bd178ec326610771dcbc61e901a6e1b8 *man/figures/enrich.png
 a4af88a784f746fc2003d06a84450cb8 *man/figures/gsea.png
 948fcd002620085809caebc0b5f65f33 *man/figures/heatmap.png
 d673fca921788bbd1a792a816c17f2a2 *man/figures/logo.png
-52ae41cf27cb767718ec3461e0713fb6 *man/figures/pie-ring.png
+e47ba1d4402f282ff4fb212f50e9e255 *man/figures/pie-ring.png
 6f6fc41a418a8505a791307486a46d49 *man/figures/radar-spider.png
 f17fc9f051cca620e354f2157fa1ad0d *man/figures/sankey-alluvial.png
 63cee15eb44b28ce994dd7d3d26bfdc5 *man/figures/volcano-wordcloud.png
