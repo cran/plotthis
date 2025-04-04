@@ -98,6 +98,10 @@ Heatmap(
   nrow = NULL,
   ncol = NULL,
   byrow = TRUE,
+  axes = NULL,
+  axis_titles = axes,
+  guides = NULL,
+  design = NULL,
   ...
 )
 }
@@ -356,6 +360,37 @@ if \code{waiver()}, for single groups, the legend will be "none", otherwise "rig
 
 \item{byrow}{A logical value indicating whether to fill the plots by row.}
 
+\item{axes}{A string specifying how axes should be treated. Passed to \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}}.
+Only relevant when \code{split_by} is used and \code{combine} is TRUE.
+Options are:
+\itemize{
+\item 'keep' will retain all axes in individual plots.
+\item 'collect' will remove duplicated axes when placed in the same run of rows or columns of the layout.
+\item 'collect_x' and 'collect_y' will remove duplicated x-axes in the columns or duplicated y-axes in the rows respectively.
+}}
+
+\item{axis_titles}{A string specifying how axis titltes should be treated. Passed to \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}}.
+Only relevant when \code{split_by} is used and \code{combine} is TRUE.
+Options are:
+\itemize{
+\item 'keep' will retain all axis titles in individual plots.
+\item 'collect' will remove duplicated titles in one direction and merge titles in the opposite direction.
+\item 'collect_x' and 'collect_y' control this for x-axis titles and y-axis titles respectively.
+}}
+
+\item{guides}{A string specifying how guides should be treated in the layout. Passed to \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}}.
+Only relevant when \code{split_by} is used and \code{combine} is TRUE.
+Options are:
+\itemize{
+\item 'collect' will collect guides below to the given nesting level, removing duplicates.
+\item 'keep' will stop collection at this level and let guides be placed alongside their plot.
+\item 'auto' will allow guides to be collected if a upper level tries, but place them alongside the plot if not.
+}}
+
+\item{design}{Specification of the location of areas in the layout, passed to \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}}.
+Only relevant when \code{split_by} is used and \code{combine} is TRUE. When specified, \code{nrow}, \code{ncol}, and \code{byrow} are ignored.
+See \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}} for more details.}
+
 \item{...}{Additional arguments.}
 }
 \value{
@@ -400,7 +435,9 @@ Heatmap(data, rows = list(RG1 = c("F1", "F2", "F3"), RG2 = c("F4", "F5", "F6")),
 # Multiple columns_by, each as a split
 Heatmap(data, rows = rows, columns_by = c("c", "s"), columns_by_sep = "/")
 Heatmap(data, rows = rows, columns_by = c("p1", "p2", "p3"))
-Heatmap(data, rows = rows, columns_by = "c", split_by = "s")
+Heatmap(data, rows = rows, columns_by = "c", split_by = "s",
+   upper_cutoff = 2, lower_cutoff = -2, legend.position = c("none", "right"),
+   design = "AAAAAA#BBBBBBB")
 Heatmap(data, rows = rows, columns_by = "c", columns_split_by = "s")
 Heatmap(data, rows = rows, columns_by = "c", columns_split_by = "s",
         rows_data = rows_data, rows_split_by = "rs")

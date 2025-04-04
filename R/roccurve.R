@@ -428,7 +428,8 @@ ROCCurve <- function(data, truth_by, score_by, pos_label = NULL, split_by = NULL
     facet_by = NULL, facet_scales = "fixed", facet_ncol = NULL, facet_nrow = NULL, facet_byrow = TRUE,
     aspect.ratio = 1, legend.position = waiver(), legend.direction = "vertical", title = NULL, subtitle = NULL,
     xlab = ifelse(x_axis_reverse, "Specificity", "1 - Specificity"), ylab = "Sensitivity",
-    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525, ...) {
+    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525,
+    axes = NULL, axis_titles = axes, guides = NULL, design = NULL, ...) {
     validate_common_args(seed, facet_by)
     split_by <- check_columns(data, split_by, force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = split_by_sep)
 
@@ -443,6 +444,8 @@ ROCCurve <- function(data, truth_by, score_by, pos_label = NULL, split_by = NULL
 
     palette <- check_palette(palette, names(datas))
     palcolor <- check_palcolor(palcolor, names(datas))
+    legend.direction <- check_legend(legend.direction, names(datas), "legend.direction")
+    legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -465,12 +468,14 @@ ROCCurve <- function(data, truth_by, score_by, pos_label = NULL, split_by = NULL
                 cutoffs_label_bg_r = cutoffs_label_bg_r, show_auc = show_auc, auc_accuracy = auc_accuracy, auc_size = auc_size,
                 theme = theme, theme_args = theme_args, palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha,
                 facet_by = facet_by, facet_scales = facet_scales, facet_ncol = facet_ncol, facet_nrow = facet_nrow, facet_byrow = facet_byrow,
-                aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction, title = title, subtitle = subtitle,
-                xlab = xlab, ylab = ylab, ...)
+                aspect.ratio = aspect.ratio, legend.position = legend.position[[nm]], legend.direction = legend.direction[[nm]],
+                title = title, subtitle = subtitle, xlab = xlab, ylab = ylab, ...)
         }
     )
 
-    p <- combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow)
+    p <- combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
+        axes = axes, axis_titles = axis_titles, guides = guides, design = design)
+
     if (!combine) {
         return(p)
     } else {

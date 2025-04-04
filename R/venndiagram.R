@@ -309,7 +309,8 @@ VennDiagram <- function(
     palette = ifelse(fill_mode == "set", "Paired", "Spectral"), palcolor = NULL, alpha = 1,
     theme = "theme_this", theme_args = list(), title = NULL, subtitle = NULL,
     legend.position = "right", legend.direction = "vertical",
-    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525, ...
+    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525,
+    axes = NULL, axis_titles = axes, guides = NULL, design = NULL, ...
 ) {
     validate_common_args(seed)
     theme <- process_theme(theme)
@@ -328,6 +329,8 @@ VennDiagram <- function(
     }
     palette <- check_palette(palette, names(datas))
     palcolor <- check_palcolor(palcolor, names(datas))
+    legend.direction <- check_legend(legend.direction, names(datas), "legend.direction")
+    legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -345,10 +348,11 @@ VennDiagram <- function(
                 label = label, label_fg = label_fg, label_size = label_size, label_bg = label_bg, label_bg_r = label_bg_r,
                 fill_mode = fill_mode, fill_name = fill_name, palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha,
                 theme = theme, theme_args = theme_args, title = title, subtitle = subtitle,
-                legend.position = legend.position, legend.direction = legend.direction, ...
+                legend.position = legend.position[[nm]], legend.direction = legend.direction[[nm]], ...
             )
         }
     )
 
-    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow)
+    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
+        axes = axes, axis_titles = axis_titles, guides = guides, design = design)
 }

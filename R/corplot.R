@@ -256,7 +256,8 @@ CorPlot <- function(
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL,
     facet_by = NULL, facet_scales = "fixed", facet_ncol = NULL, facet_nrow = NULL, facet_byrow = TRUE,
     aspect.ratio = 1, legend.position = waiver(), legend.direction = "vertical", seed = 8525,
-    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, ...
+    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE,
+    axes = NULL, axis_titles = axes, guides = NULL, design = NULL, ...
 ) {
     validate_common_args(seed, facet_by = facet_by)
     theme <- process_theme(theme)
@@ -273,6 +274,8 @@ CorPlot <- function(
 
     palette <- check_palette(palette, names(datas))
     palcolor <- check_palcolor(palcolor, names(datas))
+    legend.direction <- check_legend(legend.direction, names(datas), "legend.direction")
+    legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -291,13 +294,14 @@ CorPlot <- function(
                 theme = theme, theme_args = theme_args, palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha,
                 title = title, subtitle = subtitle, xlab = xlab, ylab = ylab,
                 facet_by = facet_by, facet_scales = facet_scales, facet_ncol = facet_ncol, facet_nrow = facet_nrow, facet_byrow = facet_byrow,
-                aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction, seed = seed,
+                aspect.ratio = aspect.ratio, legend.position = legend.position[[nm]], legend.direction = legend.direction[[nm]], seed = seed,
                 ...
             )
         }
     )
 
-    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow)
+    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
+        axes = axes, axis_titles = axis_titles, guides = guides, design = design)
 }
 
 #' Atomic Correlation Pairs Plot
@@ -646,7 +650,8 @@ CorPairsPlot <- function(
     cor_size = 3, cor_format = "corr: {round(corr, 2)}", cor_fg = "black", cor_bg = "white", cor_bg_r = 0.1,
     theme = "theme_this", theme_args = list(), palette = ifelse(is.null(group_by), "Spectral", "Paired"), palcolor = NULL,
     title = NULL, subtitle = NULL, facet_by = NULL, legend.position = "right", legend.direction = "vertical", seed = 8525,
-    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, ...
+    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, axes = NULL, axis_titles = axes, guides = NULL, design = NULL,
+    ...
 ) {
     validate_common_args(seed)
     split_by <- check_columns(data, split_by, force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = split_by_sep)
@@ -662,6 +667,8 @@ CorPairsPlot <- function(
 
     palette <- check_palette(palette, names(datas))
     palcolor <- check_palcolor(palcolor, names(datas))
+    legend.direction <- check_legend(legend.direction, names(datas), "legend.direction")
+    legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -681,11 +688,12 @@ CorPairsPlot <- function(
                 cor_method = cor_method, cor_palette = cor_palette, cor_palcolor = cor_palcolor,
                 cor_size = cor_size, cor_format = cor_format, cor_fg = cor_fg, cor_bg = cor_bg, cor_bg_r = cor_bg_r,
                 theme = theme, theme_args = theme_args, palette = palette[[nm]], palcolor = palcolor[[nm]],
-                title = title, subtitle = subtitle, legend.position = legend.position, legend.direction = legend.direction, seed = seed,
-                ...
+                title = title, subtitle = subtitle, legend.position = legend.position[[nm]],
+                legend.direction = legend.direction[[nm]], seed = seed, ...
             )
         }
     )
 
-    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow)
+    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
+        axes = axes, axis_titles = axis_titles, guides = guides, design = design)
 }

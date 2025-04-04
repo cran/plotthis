@@ -68,6 +68,10 @@ BarPlot(
   ncol = NULL,
   byrow = TRUE,
   seed = 8525,
+  axes = NULL,
+  axis_titles = axes,
+  guides = NULL,
+  design = NULL,
   ...
 )
 
@@ -115,6 +119,10 @@ SplitBarPlot(
   ncol = NULL,
   byrow = TRUE,
   seed = 8525,
+  axes = NULL,
+  axis_titles = axes,
+  guides = NULL,
+  design = NULL,
   ...
 )
 
@@ -162,6 +170,10 @@ WaterfallPlot(
   ncol = NULL,
   byrow = TRUE,
   seed = 8525,
+  axes = NULL,
+  axis_titles = axes,
+  guides = NULL,
+  design = NULL,
   ...
 )
 }
@@ -314,6 +326,37 @@ See also \url{https://ggplot2.tidyverse.org/reference/expansion.html}}
 
 \item{seed}{The random seed to use. Default is 8525.}
 
+\item{axes}{A string specifying how axes should be treated. Passed to \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}}.
+Only relevant when \code{split_by} is used and \code{combine} is TRUE.
+Options are:
+\itemize{
+\item 'keep' will retain all axes in individual plots.
+\item 'collect' will remove duplicated axes when placed in the same run of rows or columns of the layout.
+\item 'collect_x' and 'collect_y' will remove duplicated x-axes in the columns or duplicated y-axes in the rows respectively.
+}}
+
+\item{axis_titles}{A string specifying how axis titltes should be treated. Passed to \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}}.
+Only relevant when \code{split_by} is used and \code{combine} is TRUE.
+Options are:
+\itemize{
+\item 'keep' will retain all axis titles in individual plots.
+\item 'collect' will remove duplicated titles in one direction and merge titles in the opposite direction.
+\item 'collect_x' and 'collect_y' control this for x-axis titles and y-axis titles respectively.
+}}
+
+\item{guides}{A string specifying how guides should be treated in the layout. Passed to \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}}.
+Only relevant when \code{split_by} is used and \code{combine} is TRUE.
+Options are:
+\itemize{
+\item 'collect' will collect guides below to the given nesting level, removing duplicates.
+\item 'keep' will stop collection at this level and let guides be placed alongside their plot.
+\item 'auto' will allow guides to be collected if a upper level tries, but place them alongside the plot if not.
+}}
+
+\item{design}{Specification of the location of areas in the layout, passed to \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}}.
+Only relevant when \code{split_by} is used and \code{combine} is TRUE. When specified, \code{nrow}, \code{ncol}, and \code{byrow} are ignored.
+See \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}} for more details.}
+
 \item{...}{Additional arguments.}
 
 \item{y_sep}{A character string to concatenate the x columns if there are multiple.}
@@ -362,6 +405,7 @@ A ggplot object or wrap_plots object or a list of ggplot objects
 }
 }
 \examples{
+\donttest{
 data <- data.frame(
     x = c("A", "B", "C", "D", "E", "F", "G", "H"),
     y = c(10, 8, 16, 4, 6, 12, 14, 2),
@@ -383,6 +427,10 @@ BarPlot(data,
     facet_by = "facet", position = "dodge", facet_ncol = 1
 )
 BarPlot(data,
+    x = "x", y = "y", split_by = "group", facet_by = "facet",
+    position = "dodge", facet_ncol = 1, guides = 'collect'
+)
+BarPlot(data,
     x = "x", y = "y", split_by = "group",
     palette = list(G1 = "Reds", G2 = "Blues", G3 = "Greens", G4 = "Purp"),
     facet_by = "facet", position = "dodge", facet_ncol = 1
@@ -395,6 +443,7 @@ BarPlot(data,
 BarPlot(data, x = "group", ylab = "count")
 # flip the plot
 BarPlot(data, x = "group", flip = TRUE, ylab = "count")
+}
 data <- data.frame(
     word = c("apple", "banana", "cherry", "date", "elderberry",
              "It is a very long term with a lot of words"),

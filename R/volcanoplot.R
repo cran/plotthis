@@ -391,7 +391,8 @@ VolcanoPlot <- function(
     theme = "theme_this", theme_args = list(), palette = "Spectral", palcolor = NULL,
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL,
     aspect.ratio = 1, legend.position = "right", legend.direction = "vertical", seed = 8525,
-    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, ...
+    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE,
+    axes = NULL, axis_titles = axes, guides = NULL, design = NULL, ...
 ) {
     validate_common_args(seed, facet_by = facet_by)
     theme <- process_theme(theme)
@@ -408,6 +409,8 @@ VolcanoPlot <- function(
     }
     palette <- check_palette(palette, names(datas))
     palcolor <- check_palcolor(palcolor, names(datas))
+    legend.direction <- check_legend(legend.direction, names(datas), "legend.direction")
+    legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -428,10 +431,11 @@ VolcanoPlot <- function(
                 facet_by = facet_by, facet_scales = facet_scales, facet_ncol = facet_ncol, facet_nrow = facet_nrow, facet_byrow = facet_byrow,
                 theme = theme, theme_args = theme_args, palette = palette[[nm]], palcolor = palcolor[[nm]],
                 title = title, subtitle = subtitle, xlab = xlab, ylab = ylab,
-                aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction, seed = seed, ...
+                aspect.ratio = aspect.ratio, legend.position = legend.position[[nm]], legend.direction = legend.direction[[nm]], seed = seed, ...
             )
         }
     )
 
-    combine_plots(plots, combine, nrow, ncol, byrow)
+    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
+        axes = axes, axis_titles = axis_titles, guides = guides, design = design)
 }

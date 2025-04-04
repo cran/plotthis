@@ -1388,11 +1388,21 @@ HeatmapAtomic <- function(
 
     p <- do.call(ComplexHeatmap::Heatmap, hmargs)
     if (isTRUE(return_grob)) {
-        p <- grid.grabExpr(ComplexHeatmap::draw(p, annotation_legend_list = legends,
-            annotation_legend_side = legend.position, column_title = title))
+        if (identical(legend.position, "none")) {
+            p <- grid.grabExpr(ComplexHeatmap::draw(p, annotation_legend_list = legends,
+            show_annotation_legend = FALSE, column_title = title))
+        } else {
+            p <- grid.grabExpr(ComplexHeatmap::draw(p, annotation_legend_list = legends,
+                annotation_legend_side = legend.position, column_title = title))
+        }
     } else {
-        p <- ComplexHeatmap::draw(p, annotation_legend_list = legends,
-            annotation_legend_side = legend.position, column_title = title)
+        if (identical(legend.position, "none")) {
+            p <- ComplexHeatmap::draw(p, annotation_legend_list = legends,
+                show_annotation_legend = FALSE, column_title = title)
+        } else {
+            p <- ComplexHeatmap::draw(p, annotation_legend_list = legends,
+                annotation_legend_side = legend.position, column_title = title)
+        }
     }
 
     attr(p, "height") <- max(height, 4)
@@ -1449,7 +1459,9 @@ HeatmapAtomic <- function(
 #' # Multiple columns_by, each as a split
 #' Heatmap(data, rows = rows, columns_by = c("c", "s"), columns_by_sep = "/")
 #' Heatmap(data, rows = rows, columns_by = c("p1", "p2", "p3"))
-#' Heatmap(data, rows = rows, columns_by = "c", split_by = "s")
+#' Heatmap(data, rows = rows, columns_by = "c", split_by = "s",
+#'    upper_cutoff = 2, lower_cutoff = -2, legend.position = c("none", "right"),
+#'    design = "AAAAAA#BBBBBBB")
 #' Heatmap(data, rows = rows, columns_by = "c", columns_split_by = "s")
 #' Heatmap(data, rows = rows, columns_by = "c", columns_split_by = "s",
 #'         rows_data = rows_data, rows_split_by = "rs")
@@ -1529,7 +1541,8 @@ Heatmap <- function(
     row_annotation_type = "auto", row_annotation_params = list(), row_annotation_agg = NULL,
     add_reticle = FALSE, reticle_color = "grey",
     palette = "RdBu", palcolor = NULL, alpha = 1, legend.position = "right", legend.direction = "vertical",
-    seed = 8525, combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, ...
+    seed = 8525, combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, axes = NULL, axis_titles = axes, guides = NULL, design = NULL,
+    ...
 ) {
     validate_common_args(seed)
     if (is.null(split_by)) { split_rows_data <- FALSE }
@@ -1546,7 +1559,10 @@ Heatmap <- function(
     }
 
     if (!is.null(split_by)) {
+        columns_by <- check_columns(data, columns_by, force_factor = TRUE, allow_multi = TRUE,
+            concat_multi = TRUE, concat_sep = columns_by_sep)
         datas <- split(data, data[[d_split_by]])
+
         if (isTRUE(split_rows_data) && !is.null(rows_data)) {
             rows_datas <- split(rows_data, rows_data[[d_split_by]])
             nms <- names(datas)
@@ -1566,6 +1582,8 @@ Heatmap <- function(
     }
     palette <- check_palette(palette, names(datas))
     palcolor <- check_palcolor(palcolor, names(datas))
+    legend.direction <- check_legend(legend.direction, names(datas), "legend.direction")
+    legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     if (isTRUE(split_rows_data) && !is.null(rows_data)) {
         rows_data <- "@rows_data"
@@ -1601,11 +1619,12 @@ Heatmap <- function(
                 row_annotation = row_annotation, row_annotation_side = row_annotation_side, row_annotation_palette = row_annotation_palette,
                 row_annotation_palcolor = row_annotation_palcolor, row_annotation_type = row_annotation_type, row_annotation_params = row_annotation_params,
                 row_annotation_agg = row_annotation_agg, add_reticle = add_reticle, reticle_color = reticle_color,
-                palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha, legend.position = legend.position, legend.direction = legend.direction,
+                palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha, legend.position = legend.position[[nm]], legend.direction = legend.direction[[nm]],
                 ...
             )
         }
     )
 
-    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow)
+    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
+        axes = axes, axis_titles = axis_titles, guides = guides, design = design)
 }

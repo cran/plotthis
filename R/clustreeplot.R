@@ -177,7 +177,8 @@ ClustreePlot <- function(
     aspect.ratio = 1, legend.position = "right", legend.direction = "vertical",
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL, expand = c(0.1, 0.1),
     theme = "theme_this", theme_args = list(),
-    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525, ...
+    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525,
+    axes = NULL, axis_titles = axes, guides = NULL, design = NULL, ...
 ) {
     validate_common_args(seed)
     theme <- process_theme(theme)
@@ -194,6 +195,8 @@ ClustreePlot <- function(
 
     palette <- check_palette(palette, names(datas))
     palcolor <- check_palcolor(palcolor, names(datas))
+    legend.direction <- check_legend(legend.direction, names(datas), "legend.direction")
+    legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -206,12 +209,14 @@ ClustreePlot <- function(
             ClustreePlotAtomic(datas[[nm]],
                 prefix = prefix, flip = flip, palette = palette[[nm]], palcolor = palcolor[[nm]],
                 edge_palette = edge_palette, edge_palcolor = edge_palcolor, expand = expand,
-                aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction,
+                aspect.ratio = aspect.ratio, legend.position = legend.position[[nm]],
+                legend.direction = legend.direction[[nm]],
                 title = title, subtitle = subtitle, xlab = xlab, ylab = ylab,
                 theme = theme, theme_args = theme_args, ...
             )
         }
     )
 
-    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow)
+    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
+        axes = axes, axis_titles = axis_titles, guides = guides, design = design)
 }

@@ -318,7 +318,8 @@ RidgePlot <- function(
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL, x_text_angle = 90, keep_empty = FALSE, reverse = FALSE,
     facet_by = NULL, facet_scales = "fixed", facet_ncol = NULL, facet_nrow = NULL, facet_byrow = TRUE,
     aspect.ratio = 1, legend.position = "none", legend.direction = "vertical",
-    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525, ...) {
+    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525,
+    axes = NULL, axis_titles = axes, guides = NULL, design = NULL, ...) {
 
     validate_common_args(seed, facet_by = facet_by)
     theme <- process_theme(theme)
@@ -336,6 +337,8 @@ RidgePlot <- function(
 
     palette <- check_palette(palette, names(datas))
     palcolor <- check_palcolor(palcolor, names(datas))
+    legend.direction <- check_legend(legend.direction, names(datas), "legend.direction")
+    legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -350,12 +353,13 @@ RidgePlot <- function(
                 flip = flip, alpha = alpha, theme = theme, theme_args = theme_args, palette = palette[[nm]], palcolor = palcolor[[nm]],
                 title = title, subtitle = subtitle, xlab = xlab, ylab = ylab, x_text_angle = x_text_angle, keep_empty = keep_empty,
                 reverse = reverse, facet_by = facet_by, facet_scales = facet_scales, facet_ncol = facet_ncol, facet_nrow = facet_nrow,
-                aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction, ...
+                aspect.ratio = aspect.ratio, legend.position = legend.position[[nm]], legend.direction = legend.direction[[nm]], ...
             )
         }
     )
 
-    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow)
+    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
+        axes = axes, axis_titles = axis_titles, guides = guides, design = design)
 }
 
 #' Density Plot / Histogram
@@ -387,7 +391,8 @@ DensityPlot <- function(
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL, expand = c(bottom = 0, left = 0, right = 0),
     facet_by = NULL, facet_scales = "free_y", facet_ncol = NULL, facet_nrow = NULL, facet_byrow = TRUE,
     legend.position = ifelse(is.null(group_by), "none", "right"), legend.direction = "vertical", seed = 8525,
-    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, ...) {
+    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, axes = NULL, axis_titles = axes, guides = NULL, design = NULL,
+    ...) {
     validate_common_args(seed, facet_by = facet_by)
     theme <- process_theme(theme)
     split_by <- check_columns(data, split_by, force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = split_by_sep)
@@ -403,6 +408,8 @@ DensityPlot <- function(
 
     palette <- check_palette(palette, names(datas))
     palcolor <- check_palcolor(palcolor, names(datas))
+    legend.direction <- check_legend(legend.direction, names(datas), "legend.direction")
+    legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -419,12 +426,13 @@ DensityPlot <- function(
                 palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha, theme = theme, theme_args = theme_args,
                 title = title, subtitle = subtitle, xlab = xlab, ylab = ylab, expand = expand,
                 facet_by = facet_by, facet_scales = facet_scales, facet_ncol = facet_ncol, facet_nrow = facet_nrow, facet_byrow = facet_byrow,
-                legend.position = legend.position, legend.direction = legend.direction, ...
+                legend.position = legend.position[[nm]], legend.direction = legend.direction[[nm]], ...
             )
         }
     )
 
-    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow)
+    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
+        axes = axes, axis_titles = axis_titles, guides = guides, design = design)
 }
 
 #' @rdname densityhistoplot
@@ -457,7 +465,8 @@ Histogram <- function(
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL, expand = c(bottom = 0, left = 0, right = 0),
     facet_by = NULL, facet_scales = "free_y", facet_ncol = NULL, facet_nrow = NULL, facet_byrow = TRUE,
     legend.position = ifelse(is.null(group_by), "none", "right"), legend.direction = "vertical", seed = 8525,
-    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, ...) {
+    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, axes = NULL, axis_titles = axes, guides = NULL, design = NULL,
+    ...) {
     validate_common_args(seed, facet_by = facet_by)
     theme <- process_theme(theme)
     split_by <- check_columns(data, split_by, force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = split_by_sep)
@@ -473,6 +482,8 @@ Histogram <- function(
 
     palette <- check_palette(palette, names(datas))
     palcolor <- check_palcolor(palcolor, names(datas))
+    legend.direction <- check_legend(legend.direction, names(datas), "legend.direction")
+    legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -491,10 +502,11 @@ Histogram <- function(
                 palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha, theme = theme, theme_args = theme_args,
                 title = title, subtitle = subtitle, xlab = xlab, ylab = ylab,
                 facet_by = facet_by, facet_scales = facet_scales, facet_ncol = facet_ncol, facet_nrow = facet_nrow, facet_byrow = facet_byrow,
-                legend.position = legend.position, legend.direction = legend.direction, ...
+                legend.position = legend.position[[nm]], legend.direction = legend.direction[[nm]], ...
             )
         }
     )
 
-    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow)
+    combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
+        axes = axes, axis_titles = axis_titles, guides = guides, design = design)
 }

@@ -255,7 +255,16 @@ facet_plot <- function(plot, facet_by, facet_scales, nrow, ncol, byrow,
 #' @importFrom patchwork wrap_plots
 #' @importFrom rlang %||%
 #' @importFrom ggplot2 wrap_dims
-combine_plots <- function(plots, combine, nrow, ncol, byrow, recalc_size = TRUE) {
+combine_plots <- function(
+    plots, combine,
+    nrow = NULL,
+    ncol = NULL,
+    byrow = NULL,
+    axes = NULL,
+    axis_titles = NULL,
+    guides = NULL,
+    design = NULL,
+    recalc_size = TRUE) {
     if (isFALSE(combine)) {
         return(plots)
     }
@@ -264,7 +273,17 @@ combine_plots <- function(plots, combine, nrow, ncol, byrow, recalc_size = TRUE)
         d <- wrap_dims(length(plots), nrow, ncol)
         nrow <- d[1]
         ncol <- d[2]
-        p <- combine_plots(plots, TRUE, nrow, ncol, byrow, recalc_size = FALSE)
+        p <- combine_plots(
+            plots, TRUE,
+            nrow = nrow,
+            ncol = ncol,
+            byrow = byrow,
+            axes = axes,
+            axis_titles = axis_titles,
+            guides = guides,
+            design = design,
+            recalc_size = FALSE
+        )
         attr(p, "height") <- nrow * max(sapply(plots, function(x) attr(x, "height")))
         attr(p, "width") <- ncol * max(sapply(plots, function(x) attr(x, "width")))
         return(p)
@@ -274,7 +293,16 @@ combine_plots <- function(plots, combine, nrow, ncol, byrow, recalc_size = TRUE)
         return(plots[[1]])
     }
 
-    wrap_plots(plots, nrow = nrow, ncol = ncol, byrow = byrow)
+    wrap_plots(
+        plots,
+        nrow = nrow,
+        ncol = ncol,
+        byrow = byrow,
+        axes = axes,
+        axis_titles = axis_titles,
+        guides = guides,
+        design = design
+    )
 }
 
 
@@ -559,4 +587,38 @@ check_palcolor <- function(palcolor, datas_name) {
     # It's okay that some split_by values have no corresponding palcolor
     # because they can be NULL
     return(palcolor)
+}
+
+
+#' check_legend
+#' Check if the legend.position and legend.direction are valid
+#' @param legend The value legend.position or legend.direction
+#' @param datas_name names of the split data
+#' @keywords internal
+#' @importFrom ggplot2 waiver
+#' @return named list containing legend names
+check_legend <- function(legend, datas_name, which = c("legend.position", "legend.direction")) {
+    which <- match.arg(which)
+    legend <- as.list(legend)
+
+    if (inherits(legend, "waiver")) {
+        legend <- list(legend)
+    }
+
+    if (length(legend) == 1 && length(datas_name) > 1) {
+        legend <- rep(legend, length(datas_name))
+    }
+    if (length(legend) < length(datas_name)) {
+        stop("The length of ", which, " (", length(legend), ") is less than the number ",
+            "(", length(datas_name), ") of unique values in 'split_by'")
+    }
+    if (is.null(names(legend))) {
+        names(legend)[1:length(datas_name)] <- datas_name
+    } else if (length(setdiff(datas_name, names(legend))) > 0) {
+        stop("Values in 'split_by' (",
+            paste(setdiff(datas_name, names(legend)), collapse = ", "), ") ",
+            "have no corresponding ", which, ".")
+    }
+
+    return(legend)
 }
