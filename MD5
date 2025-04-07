@@ -1,4 +1,4 @@
-3198cb805c96d4ca7e0944e37c78642c *DESCRIPTION
+a3859b364876beea95b3a52a0a22caaf *DESCRIPTION
 bb3b571603fc331cb3f14f198c3e542a *NAMESPACE
 9e6fa3ef7a7014d0ee7a73548c01727c *R/areaplot.R
 105c649f7e2a81f5b9eeeee5b6896c34 *R/barplot.R
@@ -13,9 +13,9 @@ a9391c0821ae25d990aece349dd75c09 *R/densityplot.R
 f437ee1dc359e4be2119a8be3a4c7c34 *R/dotplot.R
 3e34ae35145a072003ab6b3c6a87c171 *R/enrich.R
 161bffddcd4dda280a3c97c28dc55d7a *R/gsea.R
-f68e97ba06147abf1a580559af682b4e *R/heatmap.R
+ab0bcb6a06d75a45c670def0f0568dcf *R/heatmap.R
 7e885c3ff15f91749f3064e57d554b6f *R/lineplot.R
-71a320c8ca5d2bf7ae7b2f1c578e1bd6 *R/manhattanplot.R
+7550b930a40837a78cc0fa1f98ece51d *R/manhattanplot.R
 8cc2116d3949acf897e99eb348709a3d *R/network.R
 2a3982f1271dc6f87d8df4ae85b9f066 *R/piechart.R
 59582a1348c22ffaced11c055b643950 *R/qqplot.R
@@ -58,13 +58,13 @@ a2d6500fb3a5f087872319385080f761 *man/DimPlotAtomic.Rd
 e314d997eae58a93d75a29761e93f587 *man/EnrichMapAtomic.Rd
 f374c55ee6f0f9c947ea4abc5990b8ac *man/EnrichNetworkAtomic.Rd
 f507f0e4ad0437f38f15f1eaa165b136 *man/GSEAPlotAtomic.Rd
-1ab8bc3d84f9e2ff0db2cc8c6fc532f2 *man/Heatmap.Rd
+999047ee68e984e7fe8e1bb7341e4af6 *man/Heatmap.Rd
 4da9d2ac484de0246b452ce70c0cce49 *man/HeatmapAtomic.Rd
 ef3526e6367c3c4e1861b0d7907897fe *man/LinePlot.Rd
 9c4a56b94face1710f00ce1fd847bc00 *man/LinePlotAtomic.Rd
 7a37328b7b935b602d4c4f30b5c6f55d *man/LinePlotGrouped.Rd
 9b958426fc894a0e70e2bfc9edf2ffed *man/LinePlotSingle.Rd
-0a893015074a7bf182adc6b5eb7f938e *man/ManhattanPlot.Rd
+88a15f184fd7118a41fdb398640f6bb7 *man/ManhattanPlot.Rd
 4c69318d7c1cff43277be31421fe1778 *man/ManhattanPlotAtomic.Rd
 b16fe059ff40ee149b93ac8ca8cad3b1 *man/Network.Rd
 6074e3fcdd9a9987b5ffb3330d9c5720 *man/NetworkAtomic.Rd

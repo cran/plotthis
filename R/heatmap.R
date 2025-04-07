@@ -117,11 +117,13 @@ gggrob <- function(p, void = TRUE, nolegend = TRUE) {
     glevels <- levels(x[[group_by]])
     colors <- palette_this(glevels, palette = palette, palcolor = palcolor)
     if (!is.null(split_by)) {
+        # We need to use show the original group_by in the legend
+        # but here we have united the split_by and group_by
         x <- x %>% unite("..split", split_by, group_by, remove = FALSE)
-        plots <- .plotting(data = x, column = column, group_by = "..split", palette = palette, palcolor = colors)
+        plots <- .plotting(data = x, column = column, group_by = "..split", palette = palette, palcolor = as.list(colors))
         plots <- lapply(plots, gggrob)
     } else {
-        plots <- .plotting(data = x, column = column, group_by = group_by, palette = palette, palcolor = colors)
+        plots <- .plotting(data = x, column = column, group_by = group_by, palette = palette, palcolor = as.list(colors))
         plots <- lapply(plots, gggrob)
     }
 
@@ -1453,44 +1455,87 @@ HeatmapAtomic <- function(
 #'    rv = rnorm(60, 0.5)
 #' )
 #'
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = list(RG1 = c("F1", "F2", "F3"), RG2 = c("F4", "F5", "F6")),
 #'    columns_by = "c")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' # Multiple columns_by, each as a split
 #' Heatmap(data, rows = rows, columns_by = c("c", "s"), columns_by_sep = "/")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = c("p1", "p2", "p3"))
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", split_by = "s",
 #'    upper_cutoff = 2, lower_cutoff = -2, legend.position = c("none", "right"),
 #'    design = "AAAAAA#BBBBBBB")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", columns_split_by = "s")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", columns_split_by = "s",
 #'         rows_data = rows_data, rows_split_by = "rs")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", columns_split_by = "s",
 #'         rows_data = rows_data, rows_split_by = "rs", flip = TRUE)
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "bars")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "bars",
 #'         bars_sample = 3)
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "label")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "label",
 #'         label_cutoff = 0)
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "dot")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "dot",
 #'         dot_size = mean)
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "dot",
 #'         dot_size = mean, row_name_annotation = FALSE, column_name_annotation = FALSE,
 #'         row_names_side = "left", cluster_rows = FALSE, cluster_columns = FALSE)
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "dot",
 #'         dot_size = mean, add_bg = TRUE)
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "dot",
 #'         dot_size = mean, add_reticle = TRUE)
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, cluster_rows = FALSE, cluster_columns = FALSE, columns_by = "p",
 #'    rows = c("p1", "p2", "p3"), name = "Category", pie_group_by = "c",
 #'    cell_type = "pie")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, cluster_rows = FALSE, cluster_columns = FALSE, columns_by = "p",
 #'    rows = c("p1", "p2", "p3"), name = "Category", pie_group_by = "c",
 #'    cell_type = "pie", pie_size = sqrt, add_bg = TRUE)
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "violin")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", cell_type = "boxplot")
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", rows_data = rows_data,
 #'   column_annotation = list(p1 = "p", p2 = "p", F1 = "F1"),
 #'   column_annotation_type = list(p1 = "ring", p2 = "bar", F1 = "violin"),
@@ -1503,6 +1548,8 @@ HeatmapAtomic <- function(
 #'   row_annotation_type = list(rp = "pie", rv = "density", rows1 = "simple"),
 #'   row_annotation_params = list(rp = list(width = grid::unit(12, "mm"))),
 #'   show_row_names = TRUE, show_column_names = TRUE)
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", rows_data = rows_data,
 #'   column_annotation = list(p1 = "p", p2 = "p", F1 = "F1"),
 #'   column_annotation_type = list(p1 = "ring", p2 = "bar", F1 = "violin"),
@@ -1515,8 +1562,11 @@ HeatmapAtomic <- function(
 #'   row_annotation_type = list(rp = "pie", rv = "density", rows1 = "simple"),
 #'   row_annotation_params = list(rp = list(width = grid::unit(12, "mm"))),
 #'   show_row_names = TRUE, show_column_names = TRUE, flip = TRUE)
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #' Heatmap(data, rows = rows, columns_by = "c", split_by = "p",
 #'         palette = list(X = "Reds", Y = "Blues", Z = "Purp"))
+#' }
 #' }
 Heatmap <- function(
     data, rows, columns_by, rows_name = "rows", columns_name = "columns", split_by = NULL, split_by_sep = "_", split_rows_data = FALSE,

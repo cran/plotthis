@@ -1,7 +1,7 @@
 Package: plotthis
 Title: High-Level Plotting Built Upon 'ggplot2' and Other Plotting
         Packages
-Version: 0.6.0
+Version: 0.6.1
 Authors@R: 
     person("Panwen", "Wang", , "pwwang@pwwang.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4614-8970"))
@@ -21,16 +21,16 @@ Depends: R (>= 4.0.0)
 Imports: circlize, ggplot2, rlang, dplyr, tidyr, glue, forcats, gtable,
         reshape2, stringr, scales, gridtext, methods, patchwork,
         ggrepel, ggnewscale, cowplot, zoo
-Suggests: testthat, alluvial, datasets, ComplexHeatmap, clustree,
-        gglogger, ggwordcloud, ggalluvial, ggVennDiagram (>= 1.5.0),
-        ggupset, ggpubr, ggforce, ggraph, ggridges, ggmanh, qqplotr,
-        hexbin, igraph, iNEXT, scattermore, concaveman, plotROC,
-        OptimalCutpoints
+Suggests: testthat, alluvial, datasets, ComplexHeatmap, cluster,
+        clustree, gglogger, ggwordcloud, ggalluvial, ggVennDiagram (>=
+        1.5.0), ggupset, ggpubr, ggforce, ggraph, ggridges, ggmanh,
+        qqplotr, hexbin, igraph, iNEXT, scattermore, concaveman,
+        plotROC, OptimalCutpoints
 LazyData: true
 Config/Needs/website: rmarkdown
 NeedsCompilation: no
-Packaged: 2025-04-04 19:53:45 UTC; pwwang
+Packaged: 2025-04-07 08:12:08 UTC; pwwang
 Author: Panwen Wang [aut, cre] (<https://orcid.org/0000-0002-4614-8970>)
 Maintainer: Panwen Wang <pwwang@pwwang.com>
 Repository: CRAN
-Date/Publication: 2025-04-04 20:10:02 UTC
+Date/Publication: 2025-04-07 09:00:02 UTC
