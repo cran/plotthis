@@ -19,8 +19,10 @@ BoxViolinPlotAtomic(
   group_by_sep = "_",
   group_name = NULL,
   x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45),
+  step_increase = 0.1,
   fill_mode = ifelse(!is.null(group_by), "dodge", "x"),
   fill_reverse = FALSE,
+  symnum_args = NULL,
   theme = "theme_this",
   theme_args = list(),
   palette = "Paired",
@@ -71,8 +73,9 @@ BoxViolinPlotAtomic(
   pairwise_method = "wilcox.test",
   multiplegroup_comparisons = FALSE,
   multiple_method = "kruskal.test",
-  sig_label = c("p.signif", "p.format"),
+  sig_label = "p.format",
   sig_labelsize = 3.5,
+  hide_ns = FALSE,
   facet_by = NULL,
   facet_scales = "fixed",
   facet_ncol = NULL,
@@ -116,9 +119,23 @@ When \code{in_form} is "wide", \code{y} is not required. The values under \code{
 
 \item{x_text_angle}{A numeric value specifying the angle of the x-axis text.}
 
+\item{step_increase}{A numeric value to specify the step increase in fraction of total height for every
+additional comparison of the significance labels.}
+
 \item{fill_mode}{A character string to specify the fill mode. Either "dodge", "x", "mean", "median".}
 
 \item{fill_reverse}{A logical value to reverse the fill colors for gradient fill (mean/median).}
+
+\item{symnum_args}{A list of arguments to pass to the function \code{symnum} for symbolic number coding of p-values.
+For example, \code{symnum_args <- list(cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, Inf), symbols = c("****", "***", "**", "*", "ns"))}.
+In other words, we use the following convention for symbols indicating statistical significance:
+\itemize{
+\item \code{ns}: p > 0.05
+\item \code{*}: p <= 0.05
+\item \verb{**}: p <= 0.01
+\item \verb{***}: p <= 0.001
+\item \verb{****}: p <= 0.0001
+}}
 
 \item{theme}{A character string or a theme class (i.e. ggplot2::theme_classic) specifying the theme to use.
 Default is "theme_this".}
@@ -157,9 +174,13 @@ if \code{waiver()}, for single groups, the legend will be "none", otherwise "rig
 
 \item{stack}{A logical value whether to stack the facetted plot by 'facet_by'.}
 
-\item{y_max}{A numeric value or a character string to specify the maximum value of the y-axis.}
+\item{y_max}{A numeric value or a character string to specify the maximum value of the y-axis.
+You can also use quantile notation like "q95" to specify the 95th percentile.
+When comparisons are set and a numeric y_max is provided, it will be used to set the y-axis limit, including
+the significance labels.}
 
-\item{y_min}{A numeric value or a character string to specify the minimum value of the y-axis.}
+\item{y_min}{A numeric value or a character string to specify the minimum value of the y-axis.
+You can also use quantile notation like "q5" to specify the 5th percentile.}
 
 \item{y_trans}{A character string to specify the transformation of the y-axis.}
 
@@ -228,9 +249,22 @@ If \code{TRUE}, it will perform pairwise comparisons for all pairs.}
 
 \item{multiple_method}{A character string to specify the multiple group comparison method.}
 
-\item{sig_label}{A character string to specify the label of the significance test.}
+\item{sig_label}{A character string to specify the label of the significance test.
+For multiple group comparisons (\code{multiplegroup_comparisons = TRUE}), it must be either "p.format" or "p.signif".
+For pairwise comparisons, it can be:
+\itemize{
+\item the column containing the label (e.g.: label = "p" or label = "p.adj"), where p is the p-value.
+Other possible values are "p.signif", "p.adj.signif", "p.format", "p.adj.format".
+\item an expression that can be formatted by the glue() package.
+For example, when specifying \code{label = "Wilcoxon, p = {p}"}, the expression \code{{p}} will be replaced by its value.
+\item a combination of plotmath expressions and glue expressions.
+You may want some of the statistical parameter in italic; for example: \code{label = "Wilcoxon, p= {p}"}
+See https://rpkgs.datanovia.com/ggpubr/reference/geom_pwc.html for more details.
+}}
 
 \item{sig_labelsize}{A numeric value to specify the size of the significance test label.}
+
+\item{hide_ns}{A logical value to hide the non-significant comparisons.}
 
 \item{facet_by}{A character string specifying the column name of the data frame to facet the plot.
 Otherwise, the data will be split by \code{split_by} and generate multiple plots

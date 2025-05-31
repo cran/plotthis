@@ -28,20 +28,12 @@ gsea_running_score <- function(genes, gene_ranks, exponent = 1, hits_only = TRUE
     }
 }
 
-#' GSEA plots
+#' Prepare fgsea result for plotting
 #'
-#' @description
-#'  * `GSEASummaryPlot` is used to plot a summary of the results of a GSEA analysis.
-#'  * `GSEAPlot` is used to plot the results of a GSEA analysis.
-#'  * `PrepareFGSEA` is used to prepare the result of GSEA from the `fgsea` package for plotting.
-#'
-#' @rdname gsea
 #' @param data A data frame of fgsea results
-#' @param gene_ranks A numeric vector of gene ranks with names
-#' @param gene_sets A list of gene sets, typically from a record of a GMT file
 #' @return A data frame with the desired columns for plotting and the gene ranks and gene sets as attributes
-#' @export
-PrepareFGSEAResult <- function(data, gene_ranks, gene_sets) {
+#' @keywords internal
+prepare_fgsea_result <- function(data) {
     data$ID <- data$pathway
     data$Description <- data$pathway
     data$pathway <- NULL
@@ -49,21 +41,33 @@ PrepareFGSEAResult <- function(data, gene_ranks, gene_sets) {
     data$pval <- NULL
     data$p.adjust <- data$padj
     data$padj <- NULL
+    if (is.character(data$leadingEdge)) {
+        data$leadingEdge <- strsplit(data$leadingEdge, ",")
+    }
     data$core_enrichment <- sapply(data$leadingEdge, paste0, collapse = "/")
     data$leadingEdge <- NULL
 
-    attr(data, "gene_ranks") <- gene_ranks
-    attr(data, "gene_sets") <- gene_sets
     data
 }
 
-#' @rdname gsea
+#' GSEA plots
 #'
+#' @description
+#'  * `GSEASummaryPlot` is used to plot a summary of the results of a GSEA analysis.
+#'  * `GSEAPlot` is used to plot the results of a GSEA analysis.
+#'
+#' @rdname gsea
 #' @inheritParams common_args
 #' @param data A data frame of GSEA results
 #'  For example, from `DOSE::gseDO()`.
 #'  Required columns are `ID`, `Description`, `NES`, `p.adjust`, `pvalue`.
 #'  The `ID` column is used to match the gene sets.
+#' @param in_form The format of the input data
+#'  * `fgsea`: The input data is from the `fgsea` package.
+#'  * `dose`: The input data is from the `DOSE` package.
+#'  * `auto`: Automatically detect the format of the input data.
+#'  When "leadingEdge" is in the input data, it will be treated as "fgsea"; otherwise,
+#'  if "core_enrichment" is in the input data, it will be treated as "dose".
 #' @param gene_ranks A numeric vector of gene ranks with genes as names
 #'  The gene ranks are used to plot the gene sets.
 #'  If `gene_ranks` is a character vector starting with `@`, the gene ranks will be taken from the attribute of `data`.
@@ -72,6 +76,8 @@ PrepareFGSEAResult <- function(data, gene_ranks, gene_sets) {
 #'  If `gene_sets` is a character vector starting with `@`, the gene sets will be taken from the attribute of `data`.
 #' @param top_term An integer to select the top terms
 #' @param metric The metric to use for the significance of the terms
+#' Typically the column name of p values or adjusted p values.
+#' It is also used to select the top terms.
 #' @param cutoff The cutoff for the significance of the terms
 #'  The terms will not be filtered with this cutoff; they are only filtered by the `top_term` ranked by the `metric`.
 #'  The cutoff here is used to show the significance of the terms on the plot.
@@ -84,6 +90,7 @@ PrepareFGSEAResult <- function(data, gene_ranks, gene_sets) {
 #' @param line_by The method to calculate the line plots.
 #'  * `prerank`: Use the gene ranks as heights to plot the line plots.
 #'  * `running_score`: Use the running score to plot the line plots.
+#' @importFrom scales pretty_breaks scientific
 #' @importFrom ggplot2 geom_linerange layer_scales theme_void ylim
 #' @export
 #' @examples
@@ -94,14 +101,15 @@ PrepareFGSEAResult <- function(data, gene_ranks, gene_sets) {
 #' GSEASummaryPlot(gsea_example, cutoff = 0.01)
 #' }
 GSEASummaryPlot <- function(
-    data, gene_ranks = "@gene_ranks", gene_sets = "@gene_sets", top_term = 10, metric = "p.adjust",
-    cutoff = 0.05, character_width = 50, line_plot_size = 0.25, metric_name = paste0("-log10(", metric, ")"),
-    nonsig_name = "Non-significant", linewidth = 0.2, line_by = c("prerank", "running_score"),
-    title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL,
+    data, in_form = c("auto", "dose", "fgsea"), gene_ranks = "@gene_ranks", gene_sets = "@gene_sets",
+    top_term = 10, metric = "p.adjust", cutoff = 0.05, character_width = 50, line_plot_size = 0.25,
+    metric_name = metric, nonsig_name = "Insignificant", linewidth = 0.2,
+    line_by = c("prerank", "running_score"), title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL,
     alpha = 0.6, aspect.ratio = 1, legend.position = "right", legend.direction = "vertical",
     theme = "theme_this", theme_args = list(), palette = "Spectral", palcolor = NULL,
     seed = 8525, ...) {
     set.seed(seed)
+    in_form <- match.arg(in_form)
     theme <- process_theme(theme)
     ggplot <- if (getOption("plotthis.gglogger.enabled", FALSE)) {
         gglogger::ggplot
@@ -112,6 +120,7 @@ GSEASummaryPlot <- function(
     if (inherits(data, "gseaResult")) {
         data <- as.data.frame(data)
     }
+
     if (is.character(gene_ranks) && length(gene_ranks) == 1 && startsWith(gene_ranks, "@")) {
         gene_ranks <- attr(data, substring(gene_ranks, 2))
     }
@@ -136,9 +145,24 @@ GSEASummaryPlot <- function(
         stop("'gene_sets' must be a list")
     }
 
+    if (in_form == "auto") {
+        if ("leadingEdge" %in% colnames(data)) {
+            in_form <- "fgsea"
+        } else if ("core_enrichment" %in% colnames(data)) {
+            in_form <- "dose"
+        } else {
+            stop("Cannot detect the input format. Please set 'in_form' to 'fgsea' or 'dose'.")
+        }
+    }
+    if (in_form == "fgsea") {
+        data <- prepare_fgsea_result(data)
+    }
     if (!is.null(top_term)) {
         data <- slice_min(data, !!sym(metric), n = top_term, with_ties = FALSE)
     }
+    data$ID <- factor(data$ID, levels = rev(unique(data$ID)))
+    data <- data[order(data$ID), , drop = FALSE]
+
     if (!is.null(cutoff)) {
         # data <- data[data[[metric]] < cutoff, , drop = FALSE]
         data$.signif <- data[[metric]] < cutoff
@@ -148,17 +172,18 @@ GSEASummaryPlot <- function(
     data$metric <- -log10(data[[metric]])
     check_columns(data, "Description", force_factor = TRUE)
     data$Description <- droplevels(data$Description)
-    data <- data[order(data$Description), , drop = FALSE]
+    # data <- data[order(data$Description), , drop = FALSE]
     data$Description <- str_wrap(data$Description, width = character_width)
     data$Description <- factor(data$Description, levels = unique(data$Description))
     data$y <- as.integer(data$Description)
+    sig_metrics <- data$metric[data$.signif]
 
     if (all(data$.signif)) {
         p <- ggplot(data, aes(x = !!sym("NES"), y = !!sym("y")))
     } else {
         p <- ggplot(data, aes(x = !!sym("NES"), y = !!sym("y"), fill = "")) +
             guides(fill = guide_legend(
-                title = nonsig_name %||% "Non-significant",
+                title = nonsig_name %||% "Insignificant",
                 override.aes = list(color = "grey80", shape = 15, size = 4),
                 order = 2
             ))
@@ -168,21 +193,20 @@ GSEASummaryPlot <- function(
     x_range <- diff(layer_scales(p)$x$range$range)
     y_range <- diff(layer_scales(p)$y$range$range)
     colors <- palette_this(
-        data$metric[data$.signif],
+        sig_metrics,
         n = sum(data$.signif), palette = palette, palcolor = palcolor,
-        alpha = alpha, type = "continuous"
+        alpha = alpha, type = "continuous", transparent = FALSE
     )
     line_plot_list <- list()
 
-    ci <- 1
     for (i in seq_len(nrow(data))) {
         if (isTRUE(data$.signif[i])) {
-            color <- colors[ci]
-            ci <- ci + 1
+            # since the values are continuous, number of colors is not equal to number of points
+            color <- colors[ceiling(data$metric[i] * length(colors) / max(sig_metrics))]
         } else {
             color <- "grey80"
         }
-        hits <- intersect(gene_sets[[data$ID[i]]], names(gene_ranks))
+        hits <- intersect(gene_sets[[as.character(data$ID[i])]], names(gene_ranks))
         if (line_by == "running_score") {
             scores <- gsea_running_score(hits, gene_ranks)
         } else {
@@ -227,15 +251,22 @@ GSEASummaryPlot <- function(
         p <- p + geom_vline(xintercept = 0, linetype = 2, color = "grey80")
     }
 
-    p <- p +
-        line_plot_list +
-        scale_color_gradientn(
+    p <- p + line_plot_list
+    if (length(colors) == 0) {
+        # in case all terms are not significant
+        p <- p + scale_color_gradientn(colors = "grey80", guide = "none")
+    } else {
+        p <- p + scale_color_gradientn(
             name = metric_name,
             colors = colors,
+            breaks = pretty_breaks(n = 4),
+            labels = function(x) scientific(10^(-x), digits = 2),
             guide = guide_colorbar(
                 frame.colour = "black", ticks.colour = "black", title.hjust = 0, order = 1
             )
-        ) +
+        )
+    }
+    p <- p +
         scale_y_continuous(breaks = seq_len(nrow(data)), labels = data$Description) +
         scale_x_continuous(expand = c(0.05, x_range * line_plot_size / 2)) +
         labs(title = title, subtitle = subtitle, x = xlab %||% "NES", y = ylab %||% "") +
@@ -405,7 +436,11 @@ GSEAPlotAtomic <- function(
         df_gene <- df[df$position == 1 & df$genes %in% genes_label_tmp, , drop = FALSE]
         gene_drop <- genes_label_tmp[!genes_label_tmp %in% df_gene$genes]
         if (length(gene_drop) > 0) {
-            warning("Gene ", paste(gene_drop, collapse = ","), " is not in the geneset ", data$ID, ": ", data$Description, immediate. = TRUE)
+            if (identical(data$ID, data$Description)) {
+                warning("Gene ", paste(gene_drop, collapse = ","), " is not in the geneset ", data$ID, immediate. = TRUE)
+            } else {
+                warning("Gene ", paste(gene_drop, collapse = ","), " is not in the geneset ", data$ID, ": ", data$Description, immediate. = TRUE)
+            }
         }
         x_nudge <- diff(range(df$x)) * 0.05
         y_nudge <- diff(range(df$runningScore)) * 0.05
@@ -513,10 +548,12 @@ GSEAPlotAtomic <- function(
 #' @inheritParams common_args
 #' @inheritParams GSEAPlotAtomic
 #' @param gene_sets A list of gene sets, typically from a record of a GMT file
-#'  The names of the list should match the `ID` column of `data`.
-#'  If `gene_sets` is a character vector starting with `@`, the gene sets will be taken from the attribute of `data`.
-#'  The GSEA plots will be plotted for each gene set. So, the number of plots will be the number of gene sets.
-#'  If you only want to plot a subset of gene sets, you can subset the `gene_sets` before passing it to this function.
+#' The names of the list should match the `ID` column of `data`.
+#' If `gene_sets` is a character vector starting with `@`, the gene sets will be taken from the attribute of `data`.
+#' The GSEA plots will be plotted for each gene set. So, the number of plots will be the number of gene sets.
+#' If you only want to plot a subset of gene sets, you can subset the `gene_sets` before passing it to this function.
+#' @param gs The names of the gene sets to plot
+#' If `NULL`, all gene sets in `gene_sets` will be plotted.
 #' @export
 #' @examples
 #' \donttest{
@@ -524,13 +561,14 @@ GSEAPlotAtomic <- function(
 #' GSEAPlot(gsea_example, gene_sets = attr(gsea_example, "gene_sets")[1:4])
 #' }
 GSEAPlot <- function(
-    data, gene_ranks = "@gene_ranks", gene_sets = "@gene_sets", sample_coregenes = FALSE,
-    line_width = 1.5, line_alpha = 1, line_color = "#6BB82D", n_coregenes = 10, genes_label = NULL,
-    label_fg = "black", label_bg = "white", label_bg_r = 0.1, label_size = 4,
-    title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL,
+    data, in_form = c("auto", "dose", "fgsea"), gene_ranks = "@gene_ranks", gene_sets = "@gene_sets",
+    gs = NULL, sample_coregenes = FALSE, line_width = 1.5, line_alpha = 1, line_color = "#6BB82D",
+    n_coregenes = 10, genes_label = NULL, label_fg = "black", label_bg = "white",
+    label_bg_r = 0.1, label_size = 4, title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL,
     combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525,
     axes = NULL, axis_titles = axes, guides = NULL, design = NULL, ...) {
     set.seed(seed)
+    in_form <- match.arg(in_form)
     if (inherits(data, "gseaResult")) {
         data <- as.data.frame(data)
     }
@@ -548,21 +586,35 @@ GSEAPlot <- function(
     if (is.null(gene_sets)) { stop("'gene_sets' must be provided") }
     if (!is.list(gene_sets)) { stop("'gene_sets' must be a list") }
 
+    if (in_form == "auto") {
+        if ("leadingEdge" %in% colnames(data)) {
+            in_form <- "fgsea"
+        } else if ("core_enrichment" %in% colnames(data)) {
+            in_form <- "dose"
+        } else {
+            stop("Cannot detect the input format. Please set 'in_form' to 'fgsea' or 'dose'.")
+        }
+    }
+    if (in_form == "fgsea") {
+        data <- prepare_fgsea_result(data)
+    }
     gsnames <- intersect(as.character(data$ID), names(gene_sets))
     gene_sets <- gene_sets[gsnames]
     data <- data[as.character(data$ID) %in% gsnames, , drop = FALSE]
     theme <- process_theme(theme)
+    gs <- gs %||% names(gene_sets)
 
-    plots <- lapply(names(gene_sets), function(gs) {
+    plots <- lapply(gs, function(g) {
         GSEAPlotAtomic(
             data,
-            gene_ranks = gene_ranks, gs = gs, genes = gene_sets[[gs]],
+            gene_ranks = gene_ranks, gs = g, genes = gene_sets[[g]],
             sample_coregenes = sample_coregenes, line_width = line_width, line_alpha = line_alpha,
             line_color = line_color, n_coregenes = n_coregenes, genes_label = genes_label,
             label_fg = label_fg, label_bg = label_bg, label_bg_r = label_bg_r, label_size = label_size,
             title = title, subtitle = subtitle, xlab = xlab, ylab = ylab, ...
         )
     })
+    names(plots) <- gs
 
     combine_plots(plots, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
         axes = axes, axis_titles = axis_titles, guides = guides, design = design)

@@ -25,9 +25,23 @@
 #' @param jitter_height A numeric value to specify the height of the jitter.
 #' @param stack A logical value whether to stack the facetted plot by 'facet_by'.
 #' @param y_max A numeric value or a character string to specify the maximum value of the y-axis.
+#' You can also use quantile notation like "q95" to specify the 95th percentile.
+#' When comparisons are set and a numeric y_max is provided, it will be used to set the y-axis limit, including
+#' the significance labels.
 #' @param y_min A numeric value or a character string to specify the minimum value of the y-axis.
+#' You can also use quantile notation like "q5" to specify the 5th percentile.
 #' @param y_trans A character string to specify the transformation of the y-axis.
 #' @param y_nbreaks A numeric value to specify the number of breaks in the y-axis.
+#' @param step_increase A numeric value to specify the step increase in fraction of total height for every
+#' additional comparison of the significance labels.
+#' @param symnum_args A list of arguments to pass to the function `symnum` for symbolic number coding of p-values.
+#' For example, `symnum_args <- list(cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, Inf), symbols = c("****", "***", "**", "*", "ns"))`.
+#' In other words, we use the following convention for symbols indicating statistical significance:
+#' * `ns`: p > 0.05
+#' * `*`: p <= 0.05
+#' * `**`: p <= 0.01
+#' * `***`: p <= 0.001
+#' * `****`: p <= 0.0001
 #' @param add_box A logical value to add box plot to the plot.
 #' @param box_color A character string to specify the color of the box plot.
 #' @param box_width A numeric value to specify the width of the box plot.
@@ -63,7 +77,17 @@
 #' @param multiplegroup_comparisons A logical value to perform multiple group comparisons.
 #' @param multiple_method A character string to specify the multiple group comparison method.
 #' @param sig_label A character string to specify the label of the significance test.
+#' For multiple group comparisons (`multiplegroup_comparisons = TRUE`), it must be either "p.format" or "p.signif".
+#' For pairwise comparisons, it can be:
+#' * the column containing the label (e.g.: label = "p" or label = "p.adj"), where p is the p-value.
+#'   Other possible values are "p.signif", "p.adj.signif", "p.format", "p.adj.format".
+#' * an expression that can be formatted by the glue() package.
+#'   For example, when specifying `label = "Wilcoxon, p = {p}"`, the expression `{p}` will be replaced by its value.
+#' * a combination of plotmath expressions and glue expressions.
+#'   You may want some of the statistical parameter in italic; for example: `label = "Wilcoxon, p= {p}"`
+#'   See https://rpkgs.datanovia.com/ggpubr/reference/geom_pwc.html for more details.
 #' @param sig_labelsize A numeric value to specify the size of the significance test label.
+#' @param hide_ns A logical value to hide the non-significant comparisons.
 #' @return A ggplot object
 #' @keywords internal
 #' @importFrom utils combn
@@ -78,8 +102,8 @@ BoxViolinPlotAtomic <- function(
     data, x, x_sep = "_", y = NULL, base = c("box", "violin"), in_form = c("long", "wide"),
     sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
     flip = FALSE, keep_empty = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45),
-    fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
+    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
+    fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE, symnum_args = NULL,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
     add_point = FALSE, pt_color = "grey30", pt_size = NULL, pt_alpha = 1, y_nbreaks = 4,
@@ -92,7 +116,7 @@ BoxViolinPlotAtomic <- function(
     highlight = NULL, highlight_color = "red2", highlight_size = 1, highlight_alpha = 1,
     comparisons = NULL, ref_group = NULL, pairwise_method = "wilcox.test",
     multiplegroup_comparisons = FALSE, multiple_method = "kruskal.test",
-    sig_label = c("p.signif", "p.format"), sig_labelsize = 3.5,
+    sig_label = "p.format", sig_labelsize = 3.5, hide_ns = FALSE,
     facet_by = NULL, facet_scales = "fixed", facet_ncol = NULL, facet_nrow = NULL, facet_byrow = TRUE,
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL, seed = 8525, ...) {
     set.seed(seed)
@@ -119,10 +143,7 @@ BoxViolinPlotAtomic <- function(
         # stop("'group_by' must be provided to when 'comparisons' is TRUE.")
         comparisons <- combn(levels(data[[x]]), 2, simplify = FALSE)
     }
-    if (isTRUE(multiplegroup_comparisons) || length(comparisons) > 0) {
-        # if (!requireNamespace("ggpubr", quietly = TRUE)) {
-        #     stop("ggpubr is required to perform comparisons.")
-        # }
+    if (length(comparisons) > 0) {
         if (!is.list(comparisons) && !isTRUE(comparisons)) {
             comparisons <- list(comparisons)
         }
@@ -130,9 +151,15 @@ BoxViolinPlotAtomic <- function(
         if (any(ncomp) > 2) {
             stop("'comparisons' must be a list in which all elements must be vectors of length 2")
         }
-        sig_label <- match.arg(sig_label)
-        data <- data %>% unite(".compares_group", !!!syms(unique(c(x, group_by, facet_by))), sep = "_", remove = FALSE)
     }
+    if (!isFALSE(multiplegroup_comparisons)) {
+        stopifnot(
+            "'sig_label' must be 'p.format' or 'p.signif' when 'multiplegroup_comparisons' is TRUE." =
+            sig_label %in% c("p.format", "p.signif")
+        )
+    }
+
+
     sort_x <- match.arg(sort_x)
     if (sort_x != "none" && !is.null(facet_by)) {
         stop("Cannot sort x-axis when facet_by is provided.")
@@ -143,13 +170,11 @@ BoxViolinPlotAtomic <- function(
         ungroup()
 
     values <- data[[y]][is.finite(data[[y]])]
-    if (is.null(y_max)) {
-        y_max_use <- max(values, na.rm = TRUE)
-    } else if (is.character(y_max)) {
+    if (is.character(y_max)) {
         q_max <- as.numeric(sub("(^q)(\\d+)", "\\2", y_max)) / 100
         y_max_use <- quantile(values, q_max, na.rm = TRUE)
     } else {
-        y_max_use <- y_max
+        y_max_use <- max(values, na.rm = TRUE)
     }
     if (is.null(y_min)) {
         y_min_use <- min(values, na.rm = TRUE)
@@ -229,7 +254,7 @@ BoxViolinPlotAtomic <- function(
             # See https://github.com/tidyverse/ggplot2/issues/2801
             # There is a fix but not yet released
             position = position_dodge(width = 0.9), scale = "width", trim = TRUE,
-            alpha = alpha, width = 0.8,
+            alpha = alpha, width = 0.8
         )
     }
     if (fill_mode == "dodge") {
@@ -271,50 +296,78 @@ BoxViolinPlotAtomic <- function(
             group_use <- names(which(rowSums(table(data[[x]], data[[group_by]]) >= 2) >= 2))
             if (any(rowSums(table(data[[x]], data[[group_by]]) >= 2) >= 3)) {
                 message("Detected more than 2 groups. Use multiple_method for comparison")
-                method <- multiple_method
+                # method <- multiple_method
+                multiplegroup_comparisons <- TRUE
             } else {
                 method <- pairwise_method
-            }
-            p <- p + ggpubr::stat_compare_means(
-                data = data[data[[x]] %in% group_use, , drop = FALSE],
-                mapping = aes(x = !!sym(x), y = !!sym(y), group = !!sym(".compares_group")),
-                label = sig_label,
-                label.y = y_max_use,
-                size = sig_labelsize,
-                step.increase = 0.1,
-                tip.length = 0.03,
-                vjust = 1,
-                method = method
-            )
 
-            y_max_use <- layer_scales(p)$y$range$range[2]
-        } else {
-            p <- p + ggpubr::stat_compare_means(
-                mapping = aes(x = !!sym(x), y = !!sym(y), group = !!sym(".compares_group")),
+                p <- p + ggpubr::geom_pwc(
+                    data = data[data[[x]] %in% group_use, , drop = FALSE],
+                    label = sig_label,
+                    label.size = sig_labelsize,
+                    y.position = y_max_use,
+                    step.increase = step_increase,
+                    symnum.args = symnum_args,
+                    tip.length = 0.03,
+                    vjust = 0,
+                    ref.group = ref_group,
+                    method = method,
+                    hide.ns = hide_ns
+                )
+
+                y_max_use <- layer_scales(p)$y$range$range[2]
+            }
+        } else if (!isTRUE(multiplegroup_comparisons)) {
+            # Convert comparisons to indices
+            comparisons <- lapply(
+                comparisons,
+                function(el) {
+                    if (!is.numeric(el)) {
+                        which(levels(data[[x]]) %in% el)
+                    } else {
+                        el
+                    }
+                }
+            )
+            p <- p + ggpubr::geom_pwc(
                 label = sig_label,
-                label.y = y_max_use,
-                size = sig_labelsize,
-                step.increase = 0.1,
+                label.size = sig_labelsize,
+                y.position = y_max_use,
+                step.increase = step_increase,
+                symnum.args = symnum_args,
                 tip.length = 0.03,
                 vjust = 0,
-                comparisons = comparisons,
+                # comparisons = comparisons,
                 ref.group = ref_group,
-                method = pairwise_method
+                method = pairwise_method,
+                method.args = list(comparisons = comparisons),
+                hide.ns = hide_ns
             )
             y_max_use <- layer_scales(p)$y$range$range[1] + (layer_scales(p)$y$range$range[2] - layer_scales(p)$y$range$range[1]) * 1.15
         }
     }
+
     if (isTRUE(multiplegroup_comparisons)) {
         p <- p + ggpubr::stat_compare_means(
-            mapping = aes(x = !!sym(x), y = !!sym(y), group = !!sym(".compares_group")),
+            mapping = if (!is.null(group_by)) {
+                aes(x = !!sym(x), y = !!sym(y), group = !!sym(group_by))
+            } else {
+                aes(x = !!sym(x), y = !!sym(y))
+            },
+            inherit.aes = FALSE,
             method = multiple_method,
-            label = sig_label,
+            symnum.args = symnum_args,
             label.y = y_max_use,
             size = sig_labelsize,
-            vjust = 1.2,
-            hjust = 0
+            label = sig_label,
+            vjust = -0.5,
+            hjust = ifelse(is.null(group_by), 0, 0.5)
         )
         y_max_use <- layer_scales(p)$y$range$range[1] + (layer_scales(p)$y$range$range[2] - layer_scales(p)$y$range$range[1]) * 1.15
+    }
+
+    if (!is.null(y_max)) {
+        y_max_use <- max(y_max_use, y_max)
     }
 
     if (isTRUE(add_point)) {
@@ -497,10 +550,10 @@ BoxViolinPlotAtomic <- function(
 #' @importFrom rlang %||%
 BoxViolinPlot <- function(
     data, x, x_sep = "_", y = NULL, base = c("box", "violin"), in_form = c("long", "wide"),
-    split_by = NULL, split_by_sep = "_",
+    split_by = NULL, split_by_sep = "_", symnum_args = NULL,
     sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
     flip = FALSE, keep_empty = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45),
+    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
@@ -514,7 +567,7 @@ BoxViolinPlot <- function(
     highlight = NULL, highlight_color = "red2", highlight_size = 1, highlight_alpha = 1,
     comparisons = NULL, ref_group = NULL, pairwise_method = "wilcox.test",
     multiplegroup_comparisons = FALSE, multiple_method = "kruskal.test",
-    sig_label = c("p.signif", "p.format"), sig_labelsize = 3.5,
+    sig_label = "p.format", sig_labelsize = 3.5, hide_ns = FALSE,
     facet_by = NULL, facet_scales = "fixed", facet_ncol = NULL, facet_nrow = NULL, facet_byrow = TRUE,
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL, seed = 8525,
     combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE,
@@ -550,10 +603,10 @@ BoxViolinPlot <- function(
             BoxViolinPlotAtomic(datas[[nm]],
                 x = x, x_sep = x_sep, y = y, base = base, in_form = in_form,
                 sort_x = sort_x, flip = flip, keep_empty = keep_empty, group_by = group_by, group_by_sep = group_by_sep, group_name = group_name,
-                x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse,
+                x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse, step_increase = step_increase,
                 theme = theme, theme_args = theme_args, palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha,
                 aspect.ratio = aspect.ratio, legend.position = legend.position[[nm]], legend.direction = legend.direction[[nm]],
-                add_point = add_point, pt_color = pt_color, pt_size = pt_size, pt_alpha = pt_alpha,
+                add_point = add_point, pt_color = pt_color, pt_size = pt_size, pt_alpha = pt_alpha, symnum_args = symnum_args,
                 jitter_width = jitter_width, jitter_height = jitter_height, stack = stack, y_max = y_max, y_min = y_min,
                 add_box = add_box, box_color = box_color, box_width = box_width, box_ptsize = box_ptsize,
                 add_trend = add_trend, trend_color = trend_color, trend_linewidth = trend_linewidth, trend_ptsize = trend_ptsize,
@@ -563,7 +616,7 @@ BoxViolinPlot <- function(
                 highlight = highlight, highlight_color = highlight_color, highlight_size = highlight_size, highlight_alpha = highlight_alpha,
                 comparisons = comparisons, ref_group = ref_group, pairwise_method = pairwise_method,
                 multiplegroup_comparisons = multiplegroup_comparisons, multiple_method = multiple_method,
-                sig_label = sig_label, sig_labelsize = sig_labelsize,
+                sig_label = sig_label, sig_labelsize = sig_labelsize, hide_ns = hide_ns,
                 facet_by = facet_by, facet_scales = facet_scales, facet_ncol = facet_ncol, facet_nrow = facet_nrow, facet_byrow = facet_byrow,
                 title = title, subtitle = subtitle, xlab = xlab, ylab = ylab, seed = seed, ...
             )
@@ -589,8 +642,8 @@ BoxViolinPlot <- function(
 #' \donttest{
 #' set.seed(8525)
 #' data <- data.frame(
-#'     x = rep(LETTERS[1:8], 40),
-#'     y = rnorm(320),
+#'     x = rep(LETTERS[1:8], each = 40),
+#'     y = c(rnorm(160), rnorm(160, mean = 1)),
 #'     group1 = sample(c("g1", "g2"), 320, replace = TRUE),
 #'     group2 = sample(c("h1", "h2", "h3", "h4"), 320, replace = TRUE)
 #' )
@@ -618,10 +671,10 @@ BoxViolinPlot <- function(
 #' }
 BoxPlot <- function(
     data, x, x_sep = "_", y = NULL, in_form = c("long", "wide"),
-    split_by = NULL, split_by_sep = "_",
+    split_by = NULL, split_by_sep = "_", symnum_args = NULL,
     sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
     flip = FALSE, keep_empty = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45),
+    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
@@ -634,7 +687,7 @@ BoxPlot <- function(
     highlight = NULL, highlight_color = "red2", highlight_size = 1, highlight_alpha = 1,
     comparisons = NULL, ref_group = NULL, pairwise_method = "wilcox.test",
     multiplegroup_comparisons = FALSE, multiple_method = "kruskal.test",
-    sig_label = c("p.signif", "p.format"), sig_labelsize = 3.5,
+    sig_label = "p.format", sig_labelsize = 3.5, hide_ns = FALSE,
     facet_by = NULL, facet_scales = "fixed", facet_ncol = NULL, facet_nrow = NULL, facet_byrow = TRUE,
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL, seed = 8525,
     combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE,
@@ -644,10 +697,10 @@ BoxPlot <- function(
         data = data, x = x, x_sep = x_sep, y = y, base = "box", in_form = in_form,
         split_by = split_by, split_by_sep = split_by_sep,
         sort_x = sort_x, flip = flip, keep_empty = keep_empty, group_by = group_by, group_by_sep = group_by_sep, group_name = group_name,
-        x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse,
+        x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse, step_increase = step_increase,
         theme = theme, theme_args = theme_args, palette = palette, palcolor = palcolor, alpha = alpha,
         aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction,
-        add_point = add_point, pt_color = pt_color, pt_size = pt_size, pt_alpha = pt_alpha,
+        add_point = add_point, pt_color = pt_color, pt_size = pt_size, pt_alpha = pt_alpha, symnum_args = symnum_args,
         jitter_width = jitter_width, jitter_height = jitter_height, stack = stack, y_max = y_max, y_min = y_min,
         add_trend = add_trend, trend_color = trend_color, trend_linewidth = trend_linewidth, trend_ptsize = trend_ptsize,
         add_stat = add_stat, stat_name = stat_name, stat_color = stat_color, stat_size = stat_size, stat_stroke = stat_stroke, stat_shape = stat_shape,
@@ -656,7 +709,7 @@ BoxPlot <- function(
         highlight = highlight, highlight_color = highlight_color, highlight_size = highlight_size, highlight_alpha = highlight_alpha,
         comparisons = comparisons, ref_group = ref_group, pairwise_method = pairwise_method,
         multiplegroup_comparisons = multiplegroup_comparisons, multiple_method = multiple_method,
-        sig_label = sig_label, sig_labelsize = sig_labelsize,
+        sig_label = sig_label, sig_labelsize = sig_labelsize, hide_ns = hide_ns,
         facet_by = facet_by, facet_scales = facet_scales, facet_ncol = facet_ncol, facet_nrow = facet_nrow, facet_byrow = facet_byrow,
         title = title, subtitle = subtitle, xlab = xlab, ylab = ylab, seed = seed, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
         axes = axes, axis_titles = axis_titles, guides = guides, ...
@@ -684,15 +737,15 @@ BoxPlot <- function(
 #'     alpha = 0.8, highlight_size = 1.5, pt_size = 1, add_box = TRUE)
 #' ViolinPlot(data,
 #'     x = "x", y = "y", group_by = "group1",
-#'     comparisons = TRUE
+#'     comparisons = TRUE, sig_label = "p = {p}"
 #' )
 #' ViolinPlot(data,
-#'     x = "x", y = "y", sig_label = "p.format",
-#'     facet_by = "group2", comparisons = list(c("A", "B"))
+#'     x = "x", y = "y", sig_label = "p.format", hide_ns = TRUE,
+#'     facet_by = "group2", comparisons = list(c("D", "E"))
 #' )
 #' ViolinPlot(data,
 #'     x = "x", y = "y", fill_mode = "mean",
-#'     facet_by = "group2", palette = "Blues"
+#'     facet_by = "group2", palette = "Blues", multiplegroup_comparisons = TRUE
 #' )
 #' ViolinPlot(data,
 #'     x = "x", y = "y", fill_mode = "mean",
@@ -706,10 +759,10 @@ BoxPlot <- function(
 #' }
 ViolinPlot <- function(
     data, x, x_sep = "_", y = NULL, in_form = c("long", "wide"),
-    split_by = NULL, split_by_sep = "_",
+    split_by = NULL, split_by_sep = "_", symnum_args = NULL,
     sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
     flip = FALSE, keep_empty = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45),
+    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
@@ -723,7 +776,7 @@ ViolinPlot <- function(
     highlight = NULL, highlight_color = "red2", highlight_size = 1, highlight_alpha = 1,
     comparisons = NULL, ref_group = NULL, pairwise_method = "wilcox.test",
     multiplegroup_comparisons = FALSE, multiple_method = "kruskal.test",
-    sig_label = c("p.signif", "p.format"), sig_labelsize = 3.5,
+    sig_label = "p.format", sig_labelsize = 3.5, hide_ns = FALSE,
     facet_by = NULL, facet_scales = "fixed", facet_ncol = NULL, facet_nrow = NULL, facet_byrow = TRUE,
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL, seed = 8525,
     combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE,
@@ -733,10 +786,10 @@ ViolinPlot <- function(
         data = data, x = x, x_sep = x_sep, y = y, base = "violin", in_form = in_form,
         split_by = split_by, split_by_sep = split_by_sep,
         sort_x = sort_x, flip = flip, keep_empty = keep_empty, group_by = group_by, group_by_sep = group_by_sep, group_name = group_name,
-        x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse,
+        x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse, step_increase = step_increase,
         theme = theme, theme_args = theme_args, palette = palette, palcolor = palcolor, alpha = alpha,
         aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction,
-        add_point = add_point, pt_color = pt_color, pt_size = pt_size, pt_alpha = pt_alpha,
+        add_point = add_point, pt_color = pt_color, pt_size = pt_size, pt_alpha = pt_alpha, symnum_args = symnum_args,
         jitter_width = jitter_width, jitter_height = jitter_height, stack = stack, y_max = y_max, y_min = y_min,
         add_box = add_box, box_color = box_color, box_width = box_width, box_ptsize = box_ptsize,
         add_trend = add_trend, trend_color = trend_color, trend_linewidth = trend_linewidth, trend_ptsize = trend_ptsize,
@@ -746,7 +799,7 @@ ViolinPlot <- function(
         highlight = highlight, highlight_color = highlight_color, highlight_size = highlight_size, highlight_alpha = highlight_alpha,
         comparisons = comparisons, ref_group = ref_group, pairwise_method = pairwise_method,
         multiplegroup_comparisons = multiplegroup_comparisons, multiple_method = multiple_method,
-        sig_label = sig_label, sig_labelsize = sig_labelsize,
+        sig_label = sig_label, sig_labelsize = sig_labelsize, hide_ns = hide_ns,
         facet_by = facet_by, facet_scales = facet_scales, facet_ncol = facet_ncol, facet_nrow = facet_nrow, facet_byrow = facet_byrow,
         title = title, subtitle = subtitle, xlab = xlab, ylab = ylab, seed = seed, combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
         axes = axes, axis_titles = axis_titles, guides = guides, ...

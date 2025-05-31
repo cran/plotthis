@@ -6,7 +6,7 @@
 \usage{
 HeatmapAtomic(
   data,
-  rows,
+  rows = NULL,
   columns_by,
   rows_name = "rows",
   rows_split_name = "rows_split",
@@ -59,8 +59,7 @@ HeatmapAtomic(
   bars_sample = 100,
   flip = FALSE,
   label_size = 10,
-  label_cutoff = NULL,
-  label_accuracy = 0.01,
+  label = identity,
   layer_fun_callback = NULL,
   cell_type = c("tile", "bars", "label", "dot", "violin", "boxplot", "pie"),
   cell_agg = mean,
@@ -101,7 +100,13 @@ The data should be in a long form where each row represents a instance in the he
 The \code{rows} should be multiple columns if you want to plot as rows, which you can refer as "features".}
 
 \item{rows}{A character string/vector of the column name(s) to plot for the rows
-Multiple columns in the data frame can be used as the rows.}
+Multiple columns in the data frame can be used as the rows. It can be:
+\itemize{
+\item A vector of column names: The columns will be used as the rows.
+\item A list of column names: The names will be used as row_split_by.
+\item A formula: \code{~ col1 + col2 + ...} The columns will be excluded from the data frame and used as the rows.
+\item NULL (default): The column names other than \code{columns_by}, \code{rows_split_by}, \code{columns_split_by} and \code{pie_group_by} will be used as the rows.
+}}
 
 \item{columns_by}{A character string of the column name to plot for the columns
 A character/factor column is expected.
@@ -145,9 +150,8 @@ If it is a function, the function should take \code{count} as the argument and r
 Other options are "value" and a function.
 \itemize{
 \item "count": Count the number of instances in \code{pie_group_by}.
-\item "value": Use the values in the columns specified by \code{rows} as the values.
-If there are multiple values for a single group in \code{pie_group_by}, a function should be provided to aggregate the values.
-If not, the sum of the values will be used and a warning will be shown.
+\item "sum": Use the values in the columns specified by \code{rows} as the values.
+The sum of the values will be used.
 \item A function: The function should take a vector of values as the argument and return a single value, for each
 group in \code{pie_group_by}.
 }}
@@ -236,9 +240,9 @@ The default is "bottom".}
 
 \item{label_size}{A numeric value specifying the size of the labels when \code{cell_type = "label"}.}
 
-\item{label_cutoff}{A numeric value specifying the cutoff to show the labels when \code{cell_type = "label"}.}
-
-\item{label_accuracy}{A numeric value specifying the accuracy of the labels when \code{cell_type = "label"}.}
+\item{label}{A function to calculate the labels for the heatmap cells.
+It takes the aggregated values as the argument and returns the labels to be shown in the heatmap.
+No labels will be shown for the NA the returned values.}
 
 \item{layer_fun_callback}{A function to add additional layers to the heatmap.
 The function should have the following arguments: \code{j}, \code{i}, \code{x}, \code{y}, \code{w}, \code{h}, \code{fill}, \code{sr} and \code{sc}.
@@ -332,7 +336,9 @@ if \code{waiver()}, for single groups, the legend will be "none", otherwise "rig
 
 \item{legend.direction}{A character string specifying the direction of the legend.}
 
-\item{...}{Additional arguments.}
+\item{...}{Other arguments passed to \code{\link[ComplexHeatmap:Heatmap]{ComplexHeatmap::Heatmap()}}
+When \code{row_names_max_width} is passed, a unit is expected. But you can also pass a numeric values,
+with a default unit "inches", or a string like "5inches" to specify the number and unit directly.}
 }
 \value{
 A drawn HeatmapList object if \code{return_grob = FALSE}. Otherwise, a grob/gTree object.
