@@ -1,7 +1,7 @@
 Package: plotthis
 Title: High-Level Plotting Built Upon 'ggplot2' and Other Plotting
         Packages
-Version: 0.7.0
+Version: 0.7.1
 Authors@R: 
     person("Panwen", "Wang", , "pwwang@pwwang.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4614-8970"))
@@ -17,7 +17,7 @@ URL: https://github.com/pwwang/plotthis
         https://pwwang.github.io/plotthis/
 BugReports: https://github.com/pwwang/plotthis/issues
 RoxygenNote: 7.3.2
-Depends: R (>= 4.0.0)
+Depends: R (>= 4.2.0)
 Imports: circlize, ggplot2, rlang, dplyr, tidyr, glue, forcats, gtable,
         reshape2, stringr, scales, gridtext, methods, patchwork,
         ggrepel, ggnewscale, cowplot, zoo
@@ -29,8 +29,8 @@ Suggests: testthat, alluvial, datasets, ComplexHeatmap, cluster,
 LazyData: true
 Config/Needs/website: rmarkdown
 NeedsCompilation: no
-Packaged: 2025-05-31 04:39:47 UTC; pwwang
+Packaged: 2025-06-20 18:17:32 UTC; pwwang
 Author: Panwen Wang [aut, cre] (ORCID: <https://orcid.org/0000-0002-4614-8970>)
 Maintainer: Panwen Wang <pwwang@pwwang.com>
 Repository: CRAN
-Date/Publication: 2025-05-31 05:00:02 UTC
+Date/Publication: 2025-06-20 18:40:02 UTC
