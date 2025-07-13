@@ -221,6 +221,7 @@
 #' @param size_by A character string specifying the column to size the points in `SpatPointsPlot`.
 #' @param size Alias of `size_by` when size is a numeric value.
 #' @param size_name A character string for the size legend title in `SpatPointsPlot`.
+#' @param lower_quantile,upper_quantile,lower_cutoff,upper_cutoff Vector of minimum and maximum cutoff values or quantile values for each numeric value.
 #' @param shape A numeric value or character string specifying the shape of the points in `SpatPointsPlot`.
 #' @param add_border Whether to add a border around the masks in `SpatMasksPlot`. Default is TRUE.
 #' @param border_color A character string of the border color. Default is "black".
@@ -245,6 +246,23 @@
 #' @param label_segment_color A character string of the label segment color. Default is "black".
 #' @param label_insitu Whether to place the raw labels (group names) in the center of the points with the corresponding group.
 #' Default is FALSE, which uses numbers instead of raw labels.
+#' @param label_pos A character string or a function specifying the position of the labels.
+#' * "mean": Place labels at the mean position of the points in each group.
+#'   Same as `function(x) mean(x, na.rm = TRUE)`.
+#' * "center": Place labels at the center of the points in each group.
+#'   Same as `function(x) mean(range(x, na.rm = TRUE))`.
+#' * "median": Place labels at the median position of the points in each group.
+#'   Same as `function(x) median(x, na.rm = TRUE)`.
+#' * "first": Place labels at the first point in each group.
+#'   Same as `function(x) x[1]`.
+#' * "last": Place labels at the last point in each group.
+#'   Same as `function(x) x[length(x)]`.
+#' * "random": Place labels at a random point in each group.
+#'   Same as `function(x) sample(x, 1)`.
+#' * "min": Place labels at the minimum position (both x and y) of the points in each group.
+#'   Same as `function(x) min(x, na.rm = TRUE)`.
+#' * "max": Place labels at the maximum position (both x and y) of the points in each group.
+#'   Same as `function(x) max(x, na.rm = TRUE)`.
 #' @param highlight A character vector of the row names to highlight. Default is NULL.
 #' @param highlight_alpha A numeric value of the highlight transparency. Default is 1.
 #' @param highlight_size A numeric value of the highlight size. Default is 1.
@@ -353,6 +371,7 @@
 #'   border_size = 1)
 #' SpatPointsPlot(points, raster = TRUE, raster_dpi = 30, color_by = "feat1")
 #' SpatPointsPlot(points, color_by = c("feat1", "feat2"), size_by = "size")
+#' SpatPointsPlot(points, color_by = "feat1", upper_cutoff = 50)
 #' SpatPointsPlot(points, color_by = "feat1", hex = TRUE)
 #' SpatPointsPlot(points, color_by = "gene", label = TRUE)
 #' SpatPointsPlot(points, color_by = "gene", highlight = 1:20,
@@ -1125,6 +1144,7 @@ SpatShapesPlot.data.frame <- function(
 SpatPointsPlot <- function(
     data, x = NULL, y = NULL,
     ext = NULL, flip_y = TRUE, color_by = NULL, size_by = NULL, size = NULL, fill_by = NULL,
+    lower_quantile = 0, upper_quantile = 0.99, lower_cutoff = NULL, upper_cutoff = NULL,
     palette = NULL, palcolor = NULL, palette_reverse = FALSE,
     alpha = 1, color_name = NULL, size_name = NULL, shape = 16,
     border_color = "black", border_size = 0.5, border_alpha = 1,
@@ -1133,6 +1153,7 @@ SpatPointsPlot <- function(
     label = FALSE, label_size = 4, label_fg = "white", label_bg = "black", label_bg_r = 0.1,
     label_repel = FALSE, label_repulsion = 20, label_pt_size = 1, label_pt_color = "black",
     label_segment_color = "black", label_insitu = FALSE,
+    label_pos = c("median", "mean", "max", "min", "first", "last", "center", "random"),
     highlight = NULL, highlight_alpha = 1, highlight_size = 1, highlight_color = "black", highlight_stroke = 0.8,
     graph = NULL, graph_x = NULL, graph_y = NULL, graph_xend = NULL, graph_yend = NULL, graph_value = NULL,
     edge_size = c(0.05, 0.5), edge_alpha = 0.1, edge_color = "grey40",
@@ -1241,6 +1262,20 @@ SpatPointsPlot <- function(
             }
         }
         facet_by <- NULL
+    }
+
+    if (!is.null(color_by) && color_by %in% names(data) && is.numeric(data[[color_by]])) {
+        lower_cutoff <- lower_cutoff %||% quantile(data[[color_by]][is.finite(data[[color_by]])], lower_quantile, na.rm = TRUE)
+        upper_cutoff <- upper_cutoff %||% quantile(data[[color_by]][is.finite(data[[color_by]])], upper_quantile, na.rm = TRUE)
+        if (upper_cutoff == lower_cutoff) {
+            if (upper_cutoff == 0) {
+                upper_cutoff <- 1e-3
+            } else {
+                upper_cutoff <- upper_cutoff + upper_cutoff * 1e-3
+            }
+        }
+        data[[color_by]][data[[color_by]] < lower_cutoff] <- lower_cutoff
+        data[[color_by]][data[[color_by]] > upper_cutoff] <- upper_cutoff
     }
 
     # Set default palette based on data type
@@ -1512,6 +1547,11 @@ SpatPointsPlot <- function(
         layers <- c(layers, geom_layer)
     }
 
+    # because the points could be very small, we need to set a larger point size for the legend
+    # to make it visible.
+    # should we make this configurable?
+    legend_point_size <- 3
+
     # Add appropriate scales
     if (color_by_is_column && !is.null(color_by)) {
         if ("fill" %in% scales_used) {
@@ -1532,7 +1572,9 @@ SpatPointsPlot <- function(
                     ggplot2::scale_fill_manual(
                         name = color_name %||% color_by,
                         values = palette_this(levels(data[[color_by]]), palette = palette, reverse = palette_reverse, palcolor = palcolor),
-                        guide = if (identical(legend.position, "none")) "none" else "legend",
+                        guide = if (identical(legend.position, "none")) "none" else ggplot2::guide_legend(
+                            override.aes = list(size = legend_point_size)
+                        ),
                         na.value = "transparent"
                     )
                 ))
@@ -1569,7 +1611,9 @@ SpatPointsPlot <- function(
                     ggplot2::scale_color_manual(
                         name = color_name %||% color_by,
                         values = colors,
-                        guide = if (identical(legend.position, "none") || "fill" %in% scales_used) "none" else "legend",
+                        guide = if (identical(legend.position, "none") || "fill" %in% scales_used) "none" else ggplot2::guide_legend(
+                            override.aes = list(size = legend_point_size)
+                        ),
                         na.value = "transparent"
                     )
                 ))
@@ -1653,11 +1697,34 @@ SpatPointsPlot <- function(
             stop("Adding labels is not supported for hex plots.")
         }
 
+        if (is.character(label_pos)) {
+            label_pos <- match.arg(label_pos)
+            if (label_pos == "median") {
+                label_pos <- function(x) median(x, na.rm = TRUE)
+            } else if (label_pos == "mean") {
+                label_pos <- function(x) mean(x, na.rm = TRUE)
+            } else if (label_pos == "first") {
+                label_pos <- function(x) x[1]
+            } else if (label_pos == "last") {
+                label_pos <- function(x) x[length(x)]
+            } else if (label_pos == "random") {
+                label_pos <- function(x) sample(x, 1)
+            } else if (label_pos == "center") {
+                label_pos <- function(x) mean(range(x, na.rm = TRUE))
+            } else if (label_pos == "min") {
+                label_pos <- function(x) min(x, na.rm = TRUE)
+            } else if (label_pos == "max") {
+                label_pos <- function(x) max(x, na.rm = TRUE)
+            } else {
+                stop("Invalid label position specified. Use 'median', 'mean', 'first', 'last', 'random', or 'center'.")
+            }
+        }
+
         if (!is.null(facet_by)) {
-            label_df <- aggregate(data[, c(x, y)], by = list(data[[color_by]], data[[facet_by]]), FUN = median)
+            label_df <- aggregate(data[, c(x, y)], by = list(data[[color_by]], data[[facet_by]]), FUN = label_pos)
             colnames(label_df)[1:2] <- c(".label", facet_by)
         } else {
-            label_df <- aggregate(data[, c(x, y)], by = list(data[[color_by]]), FUN = median)
+            label_df <- aggregate(data[, c(x, y)], by = list(data[[color_by]]), FUN = label_pos)
             colnames(label_df)[1] <- ".label"
         }
         label_df <- label_df[!is.na(label_df[, ".label"]), , drop = FALSE]

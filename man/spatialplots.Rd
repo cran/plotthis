@@ -178,6 +178,10 @@ SpatPointsPlot(
   size_by = NULL,
   size = NULL,
   fill_by = NULL,
+  lower_quantile = 0,
+  upper_quantile = 0.99,
+  lower_cutoff = NULL,
+  upper_cutoff = NULL,
   palette = NULL,
   palcolor = NULL,
   palette_reverse = FALSE,
@@ -206,6 +210,7 @@ SpatPointsPlot(
   label_pt_color = "black",
   label_segment_color = "black",
   label_insitu = FALSE,
+  label_pos = c("median", "mean", "max", "min", "first", "last", "center", "random"),
   highlight = NULL,
   highlight_alpha = 1,
   highlight_size = 1,
@@ -332,6 +337,8 @@ When facet_by is a single column and facet_wrap is used.}
 
 \item{size}{Alias of \code{size_by} when size is a numeric value.}
 
+\item{lower_quantile, upper_quantile, lower_cutoff, upper_cutoff}{Vector of minimum and maximum cutoff values or quantile values for each numeric value.}
+
 \item{color_name}{A character string for the color legend title in \code{SpatPointsPlot}.}
 
 \item{size_name}{A character string for the size legend title in \code{SpatPointsPlot}.}
@@ -370,6 +377,26 @@ When facet_by is a single column and facet_wrap is used.}
 
 \item{label_insitu}{Whether to place the raw labels (group names) in the center of the points with the corresponding group.
 Default is FALSE, which uses numbers instead of raw labels.}
+
+\item{label_pos}{A character string or a function specifying the position of the labels.
+\itemize{
+\item "mean": Place labels at the mean position of the points in each group.
+Same as \code{function(x) mean(x, na.rm = TRUE)}.
+\item "center": Place labels at the center of the points in each group.
+Same as \code{function(x) mean(range(x, na.rm = TRUE))}.
+\item "median": Place labels at the median position of the points in each group.
+Same as \code{function(x) median(x, na.rm = TRUE)}.
+\item "first": Place labels at the first point in each group.
+Same as \code{function(x) x[1]}.
+\item "last": Place labels at the last point in each group.
+Same as \code{function(x) x[length(x)]}.
+\item "random": Place labels at a random point in each group.
+Same as \code{function(x) sample(x, 1)}.
+\item "min": Place labels at the minimum position (both x and y) of the points in each group.
+Same as \code{function(x) min(x, na.rm = TRUE)}.
+\item "max": Place labels at the maximum position (both x and y) of the points in each group.
+Same as \code{function(x) max(x, na.rm = TRUE)}.
+}}
 
 \item{graph}{A character string of column names or the indexes in the data for the graph data. Default is NULL.
 If "@graph" is provided, the graph data will be extracted from the data attribute 'graph'.
@@ -485,6 +512,7 @@ SpatPointsPlot(points, color_by = "gene", size_by = "size", shape = 22,
   border_size = 1)
 SpatPointsPlot(points, raster = TRUE, raster_dpi = 30, color_by = "feat1")
 SpatPointsPlot(points, color_by = c("feat1", "feat2"), size_by = "size")
+SpatPointsPlot(points, color_by = "feat1", upper_cutoff = 50)
 SpatPointsPlot(points, color_by = "feat1", hex = TRUE)
 SpatPointsPlot(points, color_by = "gene", label = TRUE)
 SpatPointsPlot(points, color_by = "gene", highlight = 1:20,

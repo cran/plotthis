@@ -17,10 +17,6 @@ You can also install the package using `conda`:
 $ conda install pwwang::r-plotthis
 ```
 
-## Credits
-
-`plotthis` is greatly inspired by the [`SCP`][1] package, but with the plotting functions detached from the Seurat object or single-cell data analysis. It is designed to be more flexible and general-purpose, and can be used for a wide range of data types and analysis scenarios.
-
 ## Gallery
 [`AreaPlot`][2] / [`TrendPlot`][3] / [`ROCCurve`][28]
 
@@ -62,7 +58,7 @@ $ conda install pwwang::r-plotthis
 
 ![](man/figures/density-histogram.png)
 
-[`DimPlot`][17] / [`FeatureDimPlot`][17]
+[`DimPlot`][17] / [`FeatureDimPlot`][17] / [`VelocityPlot`][32]
 
 ![](man/figures/dimplot.png)
 
@@ -93,6 +89,10 @@ $ conda install pwwang::r-plotthis
 [`SpatImagePlot`][31] / [`SpatMasksPlot`][31] / [`SpatShapesPlot`][31] / [`SpatPointsPlot`][31]
 
 ![](man/figures/spatial.png)
+
+## Credits
+
+`plotthis` is greatly inspired by the [`SCP`][1] package, but with the plotting functions detached from the Seurat object or single-cell data analysis. It is designed to be more flexible and general-purpose, and can be used for a wide range of data types and analysis scenarios.
 
 
 [1]: https://zhanghao-njmu.github.io/SCP/index.html
@@ -126,3 +126,4 @@ $ conda install pwwang::r-plotthis
 [29]: https://pwwang.github.io/plotthis/reference/QQPlot.html
 [30]: https://pwwang.github.io/plotthis/reference/ManhattanPlot.html
 [31]: https://pwwang.github.io/plotthis/reference/spatialplots.html
+[32]: https://pwwang.github.io/plotthis/reference/VelocityPlot.html
