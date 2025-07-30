@@ -253,7 +253,7 @@ process_heatmap_data <- function(
         rows_name <- rows_name %||% ifelse("rows" %in% colnames(data), "rows.1", "rows")
         values_by <- values_by %||% ifelse("value" %in% colnames(data), "value.1", "value")
         data <- tidyr::pivot_longer(data, cols = rows_by, names_to = rows_name, values_to = values_by)
-        data[[rows_name]] <- factor(data[[rows_name]], levels = rows_by)
+        data[[rows_name]] <- factor(data[[rows_name]], levels = unique(rows_by))
         data <- data[order(data[[rows_name]]), , drop = FALSE]
         rows_by <- rows_name
 
@@ -926,8 +926,12 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #' @param pie_size_name A character string specifying the name of the legend for the pie size.
 #' @param label_size A numeric value specifying the size of the labels when `cell_type = "label"`.
 #' @param label A function to calculate the labels for the heatmap cells.
-#' It takes the aggregated values as the argument and returns the labels to be shown in the heatmap.
-#' No labels will be shown for the NA the returned values.
+#' It can take either 1, 3, or 5 arguments. The first argument is the aggregated values.
+#' If it takes 3 arguments, the second and third arguments are the row and column indices.
+#' If it takes 5 arguments, the second and third arguments are the row and column indices,
+#' the fourth and fifth arguments are the row and column names.
+#' The function should return a character vector of the same length as the aggregated values.
+#' If the function returns NA, no label will be shown for that cell.
 #' @param layer_fun_callback A function to add additional layers to the heatmap.
 #'  The function should have the following arguments: `j`, `i`, `x`, `y`, `w`, `h`, `fill`, `sr` and `sc`.
 #'  Please also refer to the `layer_fun` argument in `ComplexHeatmap::Heatmap`.
@@ -1465,7 +1469,16 @@ HeatmapAtomic <- function(
         hmargs$layer_fun <- function(j, i, x, y, w, h, fill, sr, sc) {
             labels <- ComplexHeatmap::pindex(hmargs$matrix, i, j)
             if (is.function(label)) {
-                labels <- label(labels)
+                nargs <- length(formalArgs(label))
+                if (nargs == 1) {
+                    labels <- label(labels)
+                } else if (nargs == 3) {
+                    labels <- label(labels, i, j)
+                } else if (nargs == 5) {
+                    labels <- label(labels, i, j, rownames(hmargs$matrix)[i], colnames(hmargs$matrix)[j])
+                } else {
+                    stop("[Heatmap] 'label' function should take 1, 3 or 5 arguments.")
+                }
             }
             inds <- !is.na(labels)
             if (any(inds)) {
@@ -1753,6 +1766,7 @@ HeatmapAtomic <- function(
     }
 
     p <- do.call(ComplexHeatmap::Heatmap, hmargs)
+    mat <- p@matrix
     if (isTRUE(return_grob)) {
         if (identical(legend.position, "none")) {
             p <- grid.grabExpr(ComplexHeatmap::draw(p,
@@ -1781,6 +1795,7 @@ HeatmapAtomic <- function(
 
     attr(p, "height") <- max(height, 4)
     attr(p, "width") <- max(width, 4)
+    attr(p, "data") <- mat
     p
 }
 
@@ -1846,6 +1861,19 @@ HeatmapAtomic <- function(
 #'         label = function(x) ifelse(
 #'             x > 0, scales::number(x, accuracy = 0.01), NA
 #'         )
+#'     )
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
+#'     # add labels based on an external data
+#'     pvalues <- matrix(runif(60, 0, 0.5), nrow = 6, ncol = 10)
+#'     Heatmap(matrix_data, rows_data = rows_data,
+#'         rows_split_by = "group", cell_type = "label",
+#'         label = function(x, i, j) {
+#'             pv <- ComplexHeatmap::pindex(pvalues, i, j)
+#'             ifelse(pv < 0.01, "***",
+#'             ifelse(pv < 0.05, "**",
+#'             ifelse(pv < 0.1, "*", NA)))
+#'         }
 #'     )
 #' }
 #' if (requireNamespace("cluster", quietly = TRUE)) {
@@ -2102,8 +2130,12 @@ Heatmap <- function(
         }
     )
 
-    combine_plots(plots,
+    p <- combine_plots(plots,
         combine = combine, nrow = nrow, ncol = ncol, byrow = byrow,
         axes = axes, axis_titles = axis_titles, guides = guides, design = design
     )
+    if (length(plots) == 1) {
+        attr(p, "data") <- attr(plots[[1]], "data")
+    }
+    p
 }
