@@ -9,7 +9,14 @@
 #'  When `in_form` is "wide", `y` is not required. The values under `x` columns will be used as y-values.
 #' @param base A character string to specify the base plot type. Either "box" or "violin".
 #' @param in_form A character string to specify the input data type. Either "long" or "wide".
-#' @param sort_x A character string to specify the sorting of x-axis. Either "none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median".
+#' @param sort_x A character string to specify the sorting of x-axis, chosen from "none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median".
+#' * `none` means no sorting (as-is).
+#' * `mean_asc` sorts the x-axis by ascending mean of y-values.
+#' * `mean_desc` sorts the x-axis by descending mean of y-values.
+#' * `mean` is an alias for `mean_asc`.
+#' * `median_asc` sorts the x-axis by ascending median of y-values.
+#' * `median_desc` sorts the x-axis by descending median of y-values.
+#' * `median` is an alias for `median_asc`.
 #' @param flip A logical value to flip the plot.
 #' @param keep_empty A logical value to keep the empty levels in the x-axis.
 #' @param group_by A character string of the column name to dodge the boxes/violins
@@ -95,7 +102,7 @@
 #' @importFrom stats median quantile
 #' @importFrom rlang sym syms parse_expr
 #' @importFrom dplyr mutate ungroup first
-#' @importFrom ggplot2 geom_boxplot geom_violin geom_jitter geom_point geom_line geom_hline geom_vline
+#' @importFrom ggplot2 geom_boxplot geom_violin geom_jitter geom_point geom_line geom_hline geom_vline layer_data
 #' @importFrom ggplot2 scale_fill_manual scale_color_manual scale_shape_manual scale_linetype_manual stat_summary
 #' @importFrom ggplot2 labs theme element_line element_text position_dodge position_jitter coord_flip layer_scales
 #' @importFrom ggplot2 position_jitterdodge scale_shape_identity scale_size_manual scale_alpha_manual scale_y_continuous
@@ -108,7 +115,7 @@ BoxViolinPlotAtomic <- function(
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
     add_point = FALSE, pt_color = "grey30", pt_size = NULL, pt_alpha = 1, y_nbreaks = 4,
-    jitter_width = 0.5, jitter_height = 0.1, stack = FALSE, y_max = NULL, y_min = NULL, y_trans = "identity",
+    jitter_width = 0.5, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL, y_trans = "identity",
     add_box = FALSE, box_color = "black", box_width = 0.1, box_ptsize = 2.5,
     add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
@@ -209,13 +216,13 @@ BoxViolinPlotAtomic <- function(
     data$.highlight <- factor(as.character(data$.highlight), levels = c("TRUE", "FALSE"))
 
     if (sort_x == "mean" || sort_x == "mean_asc") {
-        data[[x]] <- stats::reorder(data[[x]], order(data$.y_mean))
+        data[[x]] <- stats::reorder(data[[x]], data$.y_mean)
     } else if (sort_x == "mean_desc") {
-        data[[x]] <- stats::reorder(data[[x]], -order(data$.y_mean))
+        data[[x]] <- stats::reorder(data[[x]], -data$.y_mean)
     } else if (sort_x == "median" || sort_x == "median_asc") {
-        data[[x]] <- stats::reorder(data[[x]], order(data$.y_median))
+        data[[x]] <- stats::reorder(data[[x]], data$.y_median)
     } else if (sort_x == "median_desc") {
-        data[[x]] <- stats::reorder(data[[x]], -order(data$.y_median))
+        data[[x]] <- stats::reorder(data[[x]], -data$.y_median)
     }
 
     if (isTRUE(flip)) {
@@ -294,7 +301,8 @@ BoxViolinPlotAtomic <- function(
 
     if (length(comparisons) > 0) {
         if (isTRUE(comparisons)) {
-            group_use <- names(which(rowSums(table(data[[x]], data[[group_by]]) >= 2) >= 2))
+            # group_use <- names(which(rowSums(table(data[[x]], data[[group_by]]) >= 2) >= 2))
+            # print(group_use)
             if (any(rowSums(table(data[[x]], data[[group_by]]) >= 2) >= 3)) {
                 message("Detected more than 2 groups. Use multiple_method for comparison")
                 # method <- multiple_method
@@ -302,8 +310,12 @@ BoxViolinPlotAtomic <- function(
             } else {
                 method <- pairwise_method
 
-                p <- p + ggpubr::geom_pwc(
-                    data = data[data[[x]] %in% group_use, , drop = FALSE],
+                if (!identical(fill_mode, "dodge")) {
+                    stop("`comparisons` can only be used with `fill_mode = 'dodge'`.")
+                }
+
+                p2 <- p + ggpubr::geom_pwc(
+                    # data = data[data[[x]] %in% group_use, , drop = FALSE],
                     label = sig_label,
                     label.size = sig_labelsize,
                     y.position = y_max_use,
@@ -315,6 +327,56 @@ BoxViolinPlotAtomic <- function(
                     method = method,
                     hide.ns = hide_ns
                 )
+
+                pdata <- suppressWarnings(layer_data(p2, 2))
+                if (ncol(pdata) == 0 || length(unique(pdata$group)) < length(unique(data[[x]]))) {
+                    warning("Some pairwise comparisons failed. Adjusting data to ensure valid comparisons. Note that p-values of 1 may indicate insufficient variability in the data.")
+                    # In case some tests fail, we fix it here
+                    newdata <- split(data[, c(x, y, group_by), drop = FALSE], data[[x]])
+                    all_gs <- unique(as.character(data[[group_by]]))[1:2]
+                    for (xval in names(newdata)) {
+                        df <- newdata[[xval]]
+                        gs <- unique(as.character(df[[group_by]]))
+                        if (length(gs) < 2) {
+                            df <- data.frame(x = xval, y = c(0, 1), group_by = all_gs)
+                            colnames(df) <- c(x, y, group_by)
+                        } else {
+                            yval1 <- df[[y]][df[[group_by]] == gs[1]]
+                            yval2 <- df[[y]][df[[group_by]] == gs[2]]
+                            if (all(is.na(yval1))) {
+                                yval1 <- c(0, rep(NA, length(yval1) - 1))
+                            }
+                            if (all(is.na(yval2))) {
+                                yval2 <- c(1, rep(NA, length(yval2) - 1))
+                            }
+                            if (length(unique(yval1[!is.na(yval1)])) == 1 &&
+                                length(unique(yval2[!is.na(yval2)])) == 1) {
+                                # tests will fail
+                                yval1[!is.na(yval1)] <- c(0, rep(NA, length(yval1[!is.na(yval1)]) - 1))
+                                yval2[!is.na(yval2)] <- c(1, rep(NA, length(yval2[!is.na(yval2)]) - 1))
+                            }
+                            df[[y]][df[[group_by]] == gs[1]] <- yval1
+                            df[[y]][df[[group_by]] == gs[2]] <- yval2
+                        }
+                        newdata[[xval]] <- df
+                    }
+                    newdata <- do.call(rbind, newdata)
+                    p <- p + ggpubr::geom_pwc(
+                        data = newdata,
+                        label = sig_label,
+                        label.size = sig_labelsize,
+                        y.position = y_max_use,
+                        step.increase = step_increase,
+                        symnum.args = symnum_args,
+                        tip.length = 0.03,
+                        vjust = 0,
+                        ref.group = ref_group,
+                        method = method,
+                        hide.ns = hide_ns
+                    )
+                } else {
+                    p <- p2
+                }
 
                 y_max_use <- layer_scales(p)$y$range$range[2]
             }
@@ -366,8 +428,7 @@ BoxViolinPlotAtomic <- function(
         )
         y_max_use <- layer_scales(p)$y$range$range[1] + (layer_scales(p)$y$range$range[2] - layer_scales(p)$y$range$range[1]) * 1.15
     }
-
-    if (!is.null(y_max)) {
+    if (!is.null(y_max) && is.numeric(y_max)) {
         y_max_use <- max(y_max_use, y_max)
     }
 
@@ -559,7 +620,7 @@ BoxViolinPlot <- function(
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
     add_point = FALSE, pt_color = "grey30", pt_size = NULL, pt_alpha = 1,
-    jitter_width = 0.5, jitter_height = 0.1, stack = FALSE, y_max = NULL, y_min = NULL,
+    jitter_width = 0.5, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL,
     add_box = FALSE, box_color = "black", box_width = 0.1, box_ptsize = 2.5,
     add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
@@ -680,7 +741,7 @@ BoxPlot <- function(
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
     add_point = FALSE, pt_color = "grey30", pt_size = NULL, pt_alpha = 1,
-    jitter_width = 0.5, jitter_height = 0.1, stack = FALSE, y_max = NULL, y_min = NULL,
+    jitter_width = 0.5, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL,
     add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
     add_bg = FALSE, bg_palette = "stripe", bg_palcolor = NULL, bg_alpha = 0.2,
@@ -768,7 +829,7 @@ ViolinPlot <- function(
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
     add_point = FALSE, pt_color = "grey30", pt_size = NULL, pt_alpha = 1,
-    jitter_width = 0.5, jitter_height = 0.1, stack = FALSE, y_max = NULL, y_min = NULL,
+    jitter_width = 0.5, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL,
     add_box = FALSE, box_color = "black", box_width = 0.1, box_ptsize = 2.5,
     add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
