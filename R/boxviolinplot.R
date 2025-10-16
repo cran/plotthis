@@ -22,6 +22,7 @@
 #' @param group_by A character string of the column name to dodge the boxes/violins
 #' @param group_by_sep A character string to concatenate the columns in `group_by`, if multiple columns are provided.
 #' @param group_name A character string to name the legend of dodge.
+#' @param paired_by A character string of the column name identifying paired observations for paired tests.
 #' @param fill_mode A character string to specify the fill mode. Either "dodge", "x", "mean", "median".
 #' @param fill_reverse A logical value to reverse the fill colors for gradient fill (mean/median).
 #' @param add_point A logical value to add (jitter) points to the plot.
@@ -29,6 +30,7 @@
 #' @param pt_size A numeric value to specify the size of the points.
 #' @param pt_alpha A numeric value to specify the transparency of the points.
 #' @param jitter_width A numeric value to specify the width of the jitter.
+#' Defaults to 0.5, but when paired_by is provided, it will be set to 0.
 #' @param jitter_height A numeric value to specify the height of the jitter.
 #' @param stack A logical value whether to stack the facetted plot by 'facet_by'.
 #' @param y_max A numeric value or a character string to specify the maximum value of the y-axis.
@@ -110,12 +112,12 @@ BoxViolinPlotAtomic <- function(
     data, x, x_sep = "_", y = NULL, base = c("box", "violin"), in_form = c("long", "wide"),
     sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
     flip = FALSE, keep_empty = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
+    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE, symnum_args = NULL,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
     add_point = FALSE, pt_color = "grey30", pt_size = NULL, pt_alpha = 1, y_nbreaks = 4,
-    jitter_width = 0.5, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL, y_trans = "identity",
+    jitter_width = NULL, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL, y_trans = "identity",
     add_box = FALSE, box_color = "black", box_width = 0.1, box_ptsize = 2.5,
     add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
@@ -147,6 +149,71 @@ BoxViolinPlotAtomic <- function(
         allow_multi = TRUE, concat_multi = TRUE, concat_sep = group_by_sep
     )
     facet_by <- check_columns(data, facet_by, force_factor = TRUE, allow_multi = TRUE)
+    paired_by <- check_columns(data, paired_by, force_factor = TRUE)
+    if (!is.null(paired_by)) {
+        if (!isTRUE(add_point)) {
+            warning("Forcing 'add_point' = TRUE when 'paired_by' is provided.")
+            add_point <- TRUE
+        }
+
+        if (any(is.na(data[[paired_by]]))) {
+            warning("'paired_by' contains missing values, removing corresponding rows.")
+            data <- data[!is.na(data[[paired_by]]), , drop = FALSE]
+        }
+        n_total_col <- paste0(".n_total_", paired_by)
+        sym_ntc <- sym(n_total_col)
+        if (!is.null(group_by)) {
+            # We should have exactly two groups for each x value
+            # and for a pair, the two observations must belong to different groups
+            # and the same paired_by value
+            problem_groups <- data %>%
+                dplyr::group_by(!!!syms(c(x, paired_by, group_by))) %>%
+                dplyr::summarise(.n = dplyr::n(), .groups = "drop") %>%
+                dplyr::add_count(!!!syms(c(x, paired_by)), name = n_total_col) %>%
+                dplyr::filter(!!sym(".n") != 1 | !!sym_ntc != 2) %>%
+                dplyr::mutate(
+                    .n = ifelse(!!sym(".n") == 1, !!sym(".n"), paste0(!!sym(".n"), " (expecting 1)")),
+                    !!sym_ntc := ifelse(!!sym_ntc == 2, !!sym_ntc, paste0(!!sym_ntc, " (expecting 2)"))
+                )
+            # If not, indicate which group (x, paired_by) has the problem
+            if (nrow(problem_groups) > 0) {
+                stop("When 'paired_by' and 'group_by' are both provided, each combination of 'x' and 'paired_by' must have exactly two observations, one for each group in 'group_by'. The following combinations do not satisfy this requirement:\n",
+                    paste0(
+                        apply(problem_groups[, c(x, paired_by, group_by, ".n", n_total_col)], 1, function(row) {
+                            paste(paste(names(row), row, sep = "="), collapse = ", ")
+                        }),
+                        collapse = "\n"
+                    )
+                )
+            }
+        } else if (dplyr::n_distinct(data[[x]], na.rm = TRUE) != 2) {
+            stop("Exactly two unique values of 'x' are required when 'paired_by' is provided without 'group_by'.")
+        } else {
+            problem_groups <- data %>%
+                dplyr::group_by(!!!syms(c(x, paired_by))) %>%
+                dplyr::summarise(.n = dplyr::n(), .groups = "drop") %>%
+                dplyr::add_count(!!!syms(paired_by), name = n_total_col) %>%
+                dplyr::filter(!!sym(".n") != 1 | !!sym_ntc != 2) %>%
+                dplyr::mutate(
+                    .n = ifelse(!!sym(".n") == 1, !!sym(".n"), paste0(!!sym(".n"), " (expecting 1)")),
+                    !!sym_ntc := ifelse(!!sym_ntc == 2, !!sym_ntc, paste0(!!sym_ntc, " (expecting 2)"))
+                )
+            if (nrow(problem_groups) > 0) {
+                stop("When 'paired_by' is provided without 'group_by', each combination of 'x' and 'paired_by' must have exactly two observations, one for each value of 'x'. The following combinations do not satisfy this requirement:\n",
+                    paste0(
+                        apply(problem_groups[, c(x, paired_by, ".n", n_total_col)], 1, function(row) {
+                            paste(paste(names(row), row, sep = "="), collapse = ", ")
+                        }),
+                        collapse = "\n"
+                    )
+                )
+            }
+        }
+
+        # For paired tests, ensure data is sorted by paired_by so that
+        # corresponding observations across groups are in the same order
+        data <- data %>% dplyr::arrange(!!!syms(unique(c(paired_by, x, group_by))))
+    }
     if (isTRUE(comparisons) && is.null(group_by)) {
         # stop("'group_by' must be provided to when 'comparisons' is TRUE.")
         comparisons <- combn(levels(data[[x]]), 2, simplify = FALSE)
@@ -314,8 +381,135 @@ BoxViolinPlotAtomic <- function(
                     stop("`comparisons` can only be used with `fill_mode = 'dodge'`.")
                 }
 
-                p2 <- p + ggpubr::geom_pwc(
-                    # data = data[data[[x]] %in% group_use, , drop = FALSE],
+                # Preprocess data to avoid test failures
+                # Check each x/facet combination for problematic data
+                split_cols <- c(x, y, group_by)
+                grouping_vars <- x
+                if (!is.null(facet_by)) {
+                    split_cols <- c(split_cols, facet_by)
+                    grouping_vars <- c(grouping_vars, facet_by)
+                }
+
+                # Create grouping key for x and facet combinations
+                if (length(grouping_vars) > 1) {
+                    split_key <- interaction(data[grouping_vars], drop = TRUE, sep = " // ")
+                } else {
+                    split_key <- data[[grouping_vars]]
+                }
+
+                data_groups <- split(data[, split_cols, drop = FALSE], split_key)
+                needs_fix <- FALSE
+
+                # Check if any group will cause test failures
+                for (group_data in data_groups) {
+                    gs <- unique(as.character(group_data[[group_by]]))
+                    if (length(gs) >= 2) {
+                        yval1 <- group_data[[y]][group_data[[group_by]] == gs[1]]
+                        yval2 <- group_data[[y]][group_data[[group_by]] == gs[2]]
+                        # Check for zero variance or all NA
+                        if (all(is.na(yval1)) || all(is.na(yval2)) ||
+                            (length(unique(yval1[!is.na(yval1)])) <= 1 &&
+                             length(unique(yval2[!is.na(yval2)])) <= 1)) {
+                            needs_fix <- TRUE
+                            break
+                        }
+                    }
+                }
+
+                pwc_data <- data
+                if (needs_fix) {
+                    warning("Some pairwise comparisons may fail due to insufficient variability. Adjusting data to ensure valid comparisons.")
+
+                    # Split by facet if present
+                    if (!is.null(facet_by)) {
+                        facet_key <- interaction(data[facet_by], drop = TRUE, sep = " // ")
+                        facet_splits <- split(data[, split_cols, drop = FALSE], facet_key)
+                    } else {
+                        facet_splits <- list(data[, split_cols, drop = FALSE])
+                    }
+
+                    fixed_data_list <- lapply(facet_splits, function(facet_data) {
+                        xdata <- split(facet_data, facet_data[[x]])
+                        all_gs <- unique(as.character(facet_data[[group_by]]))[1:2]
+
+                        for (xval in names(xdata)) {
+                            df <- xdata[[xval]]
+                            gs <- unique(as.character(df[[group_by]]))
+
+                            if (length(gs) < 2) {
+                                # Create minimal data for both groups
+                                df <- data.frame(x = xval, y = c(0, 1), group_by = all_gs)
+                                colnames(df) <- c(x, y, group_by)
+                                if (!is.null(facet_by)) {
+                                    df[facet_by] <- unique(facet_data[facet_by])
+                                }
+                            } else {
+                                yval1 <- df[[y]][df[[group_by]] == gs[1]]
+                                yval2 <- df[[y]][df[[group_by]] == gs[2]]
+
+                                # Handle all NA cases
+                                if (all(is.na(yval1))) {
+                                    yval1 <- c(0, rep(NA, length(yval1) - 1))
+                                }
+                                if (all(is.na(yval2))) {
+                                    yval2 <- c(1, rep(NA, length(yval2) - 1))
+                                }
+
+                                # Handle zero variance cases
+                                unique_y1 <- unique(yval1[!is.na(yval1)])
+                                unique_y2 <- unique(yval2[!is.na(yval2)])
+
+                                if (length(unique_y1) == 1 && length(unique_y2) == 1) {
+                                    # Both groups have same single value - add minimal relative variance
+                                    # Calculate a small epsilon relative to the data scale
+                                    all_y <- c(yval1, yval2)
+                                    all_y_finite <- all_y[is.finite(all_y)]
+
+                                    if (length(all_y_finite) > 0) {
+                                        y_abs <- abs(all_y_finite)
+                                        if (max(y_abs) > 0) {
+                                            epsilon <- max(y_abs) * 1e-10
+                                        } else {
+                                            epsilon <- 1e-10
+                                        }
+                                    } else {
+                                        epsilon <- 1e-10
+                                    }
+
+                                    # Add variance within each group while maintaining the same mean
+                                    # This ensures the test will return p ≈ 1 (no significant difference)
+                                    non_na_idx_1 <- which(!is.na(yval1))
+                                    non_na_idx_2 <- which(!is.na(yval2))
+
+                                    if (length(non_na_idx_1) >= 2) {
+                                        yval1[non_na_idx_1[1]] <- unique_y1[1] - epsilon
+                                        yval1[non_na_idx_1[2]] <- unique_y1[1] + epsilon
+                                    } else if (length(non_na_idx_1) == 1) {
+                                        yval1[non_na_idx_1[1]] <- unique_y1[1]
+                                    }
+
+                                    if (length(non_na_idx_2) >= 2) {
+                                        yval2[non_na_idx_2[1]] <- unique_y2[1] - epsilon
+                                        yval2[non_na_idx_2[2]] <- unique_y2[1] + epsilon
+                                    } else if (length(non_na_idx_2) == 1) {
+                                        yval2[non_na_idx_2[1]] <- unique_y2[1]
+                                    }
+                                }
+
+                                df[[y]][df[[group_by]] == gs[1]] <- yval1
+                                df[[y]][df[[group_by]] == gs[2]] <- yval2
+                            }
+                            xdata[[xval]] <- df
+                        }
+                        do.call(rbind, xdata)
+                    })
+                    pwc_data <- do.call(rbind, fixed_data_list)
+                }
+
+                # Now call geom_pwc once with the preprocessed data
+                # Add paired test support when paired_by is provided
+                pwc_call <- list(
+                    data = pwc_data,
                     label = sig_label,
                     label.size = sig_labelsize,
                     y.position = y_max_use,
@@ -328,59 +522,19 @@ BoxViolinPlotAtomic <- function(
                     hide.ns = hide_ns
                 )
 
-                pdata <- suppressWarnings(layer_data(p2, 2))
-                if (ncol(pdata) == 0 || length(unique(pdata$group)) < length(unique(data[[x]]))) {
-                    warning("Some pairwise comparisons failed. Adjusting data to ensure valid comparisons. Note that p-values of 1 may indicate insufficient variability in the data.")
-                    # In case some tests fail, we fix it here
-                    newdata <- split(data[, c(x, y, group_by), drop = FALSE], data[[x]])
-                    all_gs <- unique(as.character(data[[group_by]]))[1:2]
-                    for (xval in names(newdata)) {
-                        df <- newdata[[xval]]
-                        gs <- unique(as.character(df[[group_by]]))
-                        if (length(gs) < 2) {
-                            df <- data.frame(x = xval, y = c(0, 1), group_by = all_gs)
-                            colnames(df) <- c(x, y, group_by)
-                        } else {
-                            yval1 <- df[[y]][df[[group_by]] == gs[1]]
-                            yval2 <- df[[y]][df[[group_by]] == gs[2]]
-                            if (all(is.na(yval1))) {
-                                yval1 <- c(0, rep(NA, length(yval1) - 1))
-                            }
-                            if (all(is.na(yval2))) {
-                                yval2 <- c(1, rep(NA, length(yval2) - 1))
-                            }
-                            if (length(unique(yval1[!is.na(yval1)])) == 1 &&
-                                length(unique(yval2[!is.na(yval2)])) == 1) {
-                                # tests will fail
-                                yval1[!is.na(yval1)] <- c(0, rep(NA, length(yval1[!is.na(yval1)]) - 1))
-                                yval2[!is.na(yval2)] <- c(1, rep(NA, length(yval2[!is.na(yval2)]) - 1))
-                            }
-                            df[[y]][df[[group_by]] == gs[1]] <- yval1
-                            df[[y]][df[[group_by]] == gs[2]] <- yval2
-                        }
-                        newdata[[xval]] <- df
-                    }
-                    newdata <- do.call(rbind, newdata)
-                    p <- p + ggpubr::geom_pwc(
-                        data = newdata,
-                        label = sig_label,
-                        label.size = sig_labelsize,
-                        y.position = y_max_use,
-                        step.increase = step_increase,
-                        symnum.args = symnum_args,
-                        tip.length = 0.03,
-                        vjust = 0,
-                        ref.group = ref_group,
-                        method = method,
-                        hide.ns = hide_ns
-                    )
-                } else {
-                    p <- p2
+                # Add paired test parameters if paired_by is provided
+                if (!is.null(paired_by)) {
+                    pwc_call$method.args <- c(pwc_call$method.args, list(paired = TRUE))
                 }
+
+                p <- p + do.call(ggpubr::geom_pwc, pwc_call)
 
                 y_max_use <- layer_scales(p)$y$range$range[2]
             }
         } else if (!isTRUE(multiplegroup_comparisons)) {
+            if (!is.null(group_by)) {
+                stop("`comparisons` can only be used when `group_by` is NULL is TRUE.")
+            }
             # Convert comparisons to indices
             comparisons <- lapply(
                 comparisons,
@@ -392,7 +546,103 @@ BoxViolinPlotAtomic <- function(
                     }
                 }
             )
+
+            # Preprocess data to avoid test failures (same as above for group_by case)
+            split_cols <- if (!is.null(group_by)) c(x, y, group_by) else c(x, y)
+            grouping_vars <- x
+            if (!is.null(facet_by)) {
+                split_cols <- c(split_cols, facet_by)
+                grouping_vars <- c(grouping_vars, facet_by)
+            }
+
+            # Create grouping key for x and facet combinations
+            if (length(grouping_vars) > 1) {
+                split_key <- interaction(data[grouping_vars], drop = TRUE, sep = " // ")
+            } else {
+                split_key <- data[[grouping_vars]]
+            }
+
+            data_groups <- split(data[, split_cols, drop = FALSE], split_key)
+            needs_fix <- FALSE
+
+            # For exact comparisons, we need to check x groups, not group_by groups
+            # Check if any x group has zero variance
+            for (group_data in data_groups) {
+                yval <- group_data[[y]]
+                # Check for zero variance or all NA
+                if (all(is.na(yval)) || length(unique(yval[!is.na(yval)])) <= 1) {
+                    needs_fix <- TRUE
+                    break
+                }
+            }
+
+            pwc_data <- data
+            if (needs_fix) {
+                warning("Some pairwise comparisons may fail due to insufficient variability. Adjusting data to ensure valid comparisons.")
+
+                # Split by facet if present
+                if (!is.null(facet_by)) {
+                    facet_key <- interaction(data[facet_by], drop = TRUE, sep = " // ")
+                    facet_splits <- split(data[, split_cols, drop = FALSE], facet_key)
+                } else {
+                    facet_splits <- list(data[, split_cols, drop = FALSE])
+                }
+
+                fixed_data_list <- lapply(facet_splits, function(facet_data) {
+                    xdata <- split(facet_data, facet_data[[x]])
+
+                    for (xval in names(xdata)) {
+                        df <- xdata[[xval]]
+                        yval <- df[[y]]
+
+                        # Handle all NA cases
+                        if (all(is.na(yval))) {
+                            yval <- c(0, 1, rep(NA, length(yval) - 2))
+                        }
+
+                        # Handle zero variance cases
+                        unique_y <- unique(yval[!is.na(yval)])
+
+                        if (length(unique_y) == 1) {
+                            # Single value - add minimal relative variance
+                            # Calculate a small epsilon relative to the data scale
+                            all_y_finite <- yval[is.finite(yval)]
+
+                            if (length(all_y_finite) > 0) {
+                                y_abs <- abs(all_y_finite)
+                                if (max(y_abs) > 0) {
+                                    epsilon <- max(y_abs) * 1e-10
+                                } else {
+                                    epsilon <- 1e-10
+                                }
+                            } else {
+                                epsilon <- 1e-10
+                            }
+
+                            # Add symmetric variance around the mean
+                            non_na_idx <- which(!is.na(yval))
+                            if (length(non_na_idx) >= 2) {
+                                yval[non_na_idx[1]] <- unique_y[1] - epsilon
+                                yval[non_na_idx[2]] <- unique_y[1] + epsilon
+                            }
+                        }
+
+                        df[[y]] <- yval
+                        xdata[[xval]] <- df
+                    }
+                    do.call(rbind, xdata)
+                })
+                pwc_data <- do.call(rbind, fixed_data_list)
+            }
+
+            # Add paired test support when paired_by is provided
+            method_args <- list(comparisons = comparisons)
+            if (!is.null(paired_by)) {
+                method_args$paired <- TRUE
+            }
+
             p <- p + ggpubr::geom_pwc(
+                data = pwc_data,
                 label = sig_label,
                 label.size = sig_labelsize,
                 y.position = y_max_use,
@@ -403,7 +653,7 @@ BoxViolinPlotAtomic <- function(
                 # comparisons = comparisons,
                 ref.group = ref_group,
                 method = pairwise_method,
-                method.args = list(comparisons = comparisons),
+                method.args = method_args,
                 hide.ns = hide_ns
             )
             y_max_use <- layer_scales(p)$y$range$range[1] + (layer_scales(p)$y$range$range[2] - layer_scales(p)$y$range$range[1]) * 1.15
@@ -433,11 +683,45 @@ BoxViolinPlotAtomic <- function(
     }
 
     if (isTRUE(add_point)) {
+        if (!is.null(paired_by)) {
+            if (is.null(group_by)) {
+                p <- p + geom_line(
+                    data = data,
+                    mapping = aes(x = !!sym(x), y = !!sym(y), group = !!sym(paired_by)),
+                    color = pt_color,
+                    alpha = pt_alpha,
+                    linewidth = 0.3,
+                    inherit.aes = FALSE
+                )
+            } else {
+                line_data <- data
+                # re-calculate x
+                # for the first group, x = integer(x) - n
+                # for the second group, x = integer(x) + n
+                line_data$.xint <- as.numeric(line_data[[x]])
+                groups <- levels(line_data[[group_by]])
+                line_data$.x <- ifelse(
+                    line_data[[group_by]] == groups[1],
+                    line_data$.xint - .225,  # n = 0.225 = 0.9 / 2 / 2
+                    line_data$.xint + .225
+                )
+                line_data$.line_group <- paste(line_data[[paired_by]], line_data[[x]], sep = " // ")
+                p <- p + geom_line(
+                    data = line_data,
+                    mapping = aes(x = !!sym(".x"), y = !!sym(y), group = !!sym(".line_group")),
+                    color = pt_color,
+                    alpha = pt_alpha,
+                    linewidth = 0.3,
+                    inherit.aes = FALSE
+                )
+            }
+        }
         p <- p +
             geom_point(
                 aes(fill = !!sym(fill_by), color = !!sym(".highlight"), size = !!sym(".highlight"), alpha = !!sym(".highlight")),
                 position = position_jitterdodge(
-                    jitter.width = jitter_width, jitter.height = jitter_height, dodge.width = 0.9, seed = seed
+                    jitter.width = jitter_width %||% ifelse(!is.null(paired_by), 0, 0.5),
+                    jitter.height = jitter_height, dodge.width = 0.9, seed = seed
                 ),
                 show.legend = FALSE
             ) +
@@ -615,12 +899,12 @@ BoxViolinPlot <- function(
     split_by = NULL, split_by_sep = "_", symnum_args = NULL,
     sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
     flip = FALSE, keep_empty = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
+    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
     add_point = FALSE, pt_color = "grey30", pt_size = NULL, pt_alpha = 1,
-    jitter_width = 0.5, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL,
+    jitter_width = NULL, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL,
     add_box = FALSE, box_color = "black", box_width = 0.1, box_ptsize = 2.5,
     add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
@@ -665,7 +949,7 @@ BoxViolinPlot <- function(
             BoxViolinPlotAtomic(datas[[nm]],
                 x = x, x_sep = x_sep, y = y, base = base, in_form = in_form,
                 sort_x = sort_x, flip = flip, keep_empty = keep_empty, group_by = group_by, group_by_sep = group_by_sep, group_name = group_name,
-                x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse, step_increase = step_increase,
+                paired_by = paired_by, x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse, step_increase = step_increase,
                 theme = theme, theme_args = theme_args, palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha,
                 aspect.ratio = aspect.ratio, legend.position = legend.position[[nm]], legend.direction = legend.direction[[nm]],
                 add_point = add_point, pt_color = pt_color, pt_size = pt_size, pt_alpha = pt_alpha, symnum_args = symnum_args,
@@ -730,18 +1014,42 @@ BoxViolinPlot <- function(
 #'     C = rnorm(100)
 #' )
 #' BoxPlot(data_wide, x = c("A", "B", "C"), in_form = "wide")
+#'
+#' paired_data <- data.frame(
+#'     subject = rep(paste0("s", 1:10), each = 2),
+#'     visit = rep(c("pre", "post"), times = 10),
+#'     value = rnorm(20)
+#' )
+#' # paired plot with connected lines and paired test
+#' BoxPlot(
+#'     paired_data,
+#'     x = "visit", y = "value", comparisons = TRUE,
+#'     paired_by = "subject", add_point = TRUE
+#' )
+#' paired_group_data <- data.frame(
+#'     subject = rep(paste0("s", 1:6), each = 2),
+#'     x = rep(c("A", "B"), each = 6),
+#'     group = rep(c("before", "after"), times = 6),
+#'     value = rnorm(12)
+#' )
+#' BoxPlot(
+#'     paired_group_data,
+#'     x = "x", y = "value",
+#'     paired_by = "subject", group_by = "group",
+#'     comparisons = TRUE, pt_size = 3, pt_color = "red"
+#' )
 #' }
 BoxPlot <- function(
     data, x, x_sep = "_", y = NULL, in_form = c("long", "wide"),
     split_by = NULL, split_by_sep = "_", symnum_args = NULL,
     sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
     flip = FALSE, keep_empty = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
+    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
     add_point = FALSE, pt_color = "grey30", pt_size = NULL, pt_alpha = 1,
-    jitter_width = 0.5, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL,
+    jitter_width = NULL, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL,
     add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
     add_bg = FALSE, bg_palette = "stripe", bg_palcolor = NULL, bg_alpha = 0.2,
@@ -759,7 +1067,7 @@ BoxPlot <- function(
         data = data, x = x, x_sep = x_sep, y = y, base = "box", in_form = in_form,
         split_by = split_by, split_by_sep = split_by_sep,
         sort_x = sort_x, flip = flip, keep_empty = keep_empty, group_by = group_by, group_by_sep = group_by_sep, group_name = group_name,
-        x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse, step_increase = step_increase,
+        paired_by = paired_by, x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse, step_increase = step_increase,
         theme = theme, theme_args = theme_args, palette = palette, palcolor = palcolor, alpha = alpha,
         aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction,
         add_point = add_point, pt_color = pt_color, pt_size = pt_size, pt_alpha = pt_alpha, symnum_args = symnum_args,
@@ -824,12 +1132,12 @@ ViolinPlot <- function(
     split_by = NULL, split_by_sep = "_", symnum_args = NULL,
     sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
     flip = FALSE, keep_empty = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
+    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
     add_point = FALSE, pt_color = "grey30", pt_size = NULL, pt_alpha = 1,
-    jitter_width = 0.5, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL,
+    jitter_width = NULL, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL,
     add_box = FALSE, box_color = "black", box_width = 0.1, box_ptsize = 2.5,
     add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
@@ -848,7 +1156,7 @@ ViolinPlot <- function(
         data = data, x = x, x_sep = x_sep, y = y, base = "violin", in_form = in_form,
         split_by = split_by, split_by_sep = split_by_sep,
         sort_x = sort_x, flip = flip, keep_empty = keep_empty, group_by = group_by, group_by_sep = group_by_sep, group_name = group_name,
-        x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse, step_increase = step_increase,
+        paired_by = paired_by, x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse, step_increase = step_increase,
         theme = theme, theme_args = theme_args, palette = palette, palcolor = palcolor, alpha = alpha,
         aspect.ratio = aspect.ratio, legend.position = legend.position, legend.direction = legend.direction,
         add_point = add_point, pt_color = pt_color, pt_size = pt_size, pt_alpha = pt_alpha, symnum_args = symnum_args,

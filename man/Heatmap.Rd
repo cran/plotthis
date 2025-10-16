@@ -233,7 +233,8 @@ If it takes 3 arguments, the second and third arguments are the row and column i
 If it takes 5 arguments, the second and third arguments are the row and column indices,
 the fourth and fifth arguments are the row and column names.
 The function should return a character vector of the same length as the aggregated values.
-If the function returns NA, no label will be shown for that cell.}
+If the function returns NA, no label will be shown for that cell.
+For the indices, if you have the same dimension of data (same order of rows and columns) as the heatmap, you need to use \code{ComplexHeatmap::pindex()} to get the correct values.}
 
 \item{label_size}{A numeric value specifying the size of the labels when \code{cell_type = "label"}.}
 
@@ -331,7 +332,8 @@ Could be a list with the keys as the names of the annotation and the values as t
 If the type is "auto", the type will be determined by the type and number of the column data.}
 
 \item{column_annotation_params}{A list of parameters passed to the annotation function.
-Could be a list with the keys as the names of the annotation and the values as the parameters.}
+Could be a list with the keys as the names of the annotation and the values as the parameters passed to the annotation function. For the parameters for names (columns_by, rows_by, columns_split_by, rows_split_by), the key should be "name.(name)", where \code{(name)} is the name of the annotation.
+See \code{\link[=anno_pie]{anno_pie()}}, \code{\link[=anno_ring]{anno_ring()}}, \code{\link[=anno_bar]{anno_bar()}}, \code{\link[=anno_violin]{anno_violin()}}, \code{\link[=anno_boxplot]{anno_boxplot()}}, \code{\link[=anno_density]{anno_density()}}, \code{\link[=anno_simple]{anno_simple()}}, \code{\link[=anno_points]{anno_points()}} and \code{\link[=anno_lines]{anno_lines()}} for the parameters of each annotation function.}
 
 \item{column_annotation_agg}{A function to aggregate the values in the column annotation.}
 
@@ -354,7 +356,8 @@ Could be a list with the keys as the names of the annotation and the values as t
 If the type is "auto", the type will be determined by the type and number of the row data.}
 
 \item{row_annotation_params}{A list of parameters passed to the annotation function.
-Could be a list with the keys as the names of the annotation and the values as the parameters.}
+Could be a list with the keys as the names of the annotation and the values as the parameters.
+Same as \code{column_annotation_params}.}
 
 \item{row_annotation_agg}{A function to aggregate the values in the row annotation.}
 
@@ -507,7 +510,7 @@ if (requireNamespace("cluster", quietly = TRUE)) {
         values_by = "Players", legend_discrete = TRUE,
         legend_items = c("Player 1" = 0, "Player 2" = 1),
         # Set the pawns
-        cell_type = "dot", dot_size = function(x) ifelse(is.na(x), 0, 1),
+        cell_type = "dot", dot_size = function(x) ifelse(is.na(x), 0, 10),
         dot_size_name = NULL,  # hide the dot size legend
         palcolor = c("white", "black"),
         # Set the board
@@ -516,10 +519,11 @@ if (requireNamespace("cluster", quietly = TRUE)) {
         width = ggplot2::unit(105, "mm"), height = ggplot2::unit(105, "mm"))
 }
 if (requireNamespace("cluster", quietly = TRUE)) {
-   # Make the row/column name annotation thinner
-   Heatmap(matrix_data,
-       column_annotation = list(simple_anno_size = ggplot2::unit(2, "mm")),
-       row_annotation = list(simple_anno_size = ggplot2::unit(2, "mm")))
+    # Make the row/column name annotation thicker
+    Heatmap(matrix_data,
+        # Use the "name." prefix
+        column_annotation_params = list(name.columns = list(height = 5)),
+        row_annotation_params = list(name.rows = list(width = 5)))
 }
 
 # Use long form data
@@ -553,8 +557,21 @@ if (requireNamespace("cluster", quietly = TRUE)) {
         cell_type = "bars")
 }
 if (requireNamespace("cluster", quietly = TRUE)) {
-    Heatmap(data, values_by = "value", rows_by = "r", columns_by = "c",
+    p <- Heatmap(data, values_by = "value", rows_by = "r", columns_by = "c",
         cell_type = "dot", dot_size = length, dot_size_name = "data points",
+        add_bg = TRUE, add_reticle = TRUE)
+    p
+}
+if (requireNamespace("cluster", quietly = TRUE)) {
+    dot_size_data <- p@data
+    # Make it big so we can see if we get the right indexing
+    # for dot_size function
+    dot_size_data["A", "a"] <- max(dot_size_data) * 2
+
+    Heatmap(data, values_by = "value", rows_by = "r", columns_by = "c",
+        cell_type = "dot", dot_size_name = "data points",
+        dot_size = function(x, i, j) ComplexHeatmap::pindex(dot_size_data, i, j),
+        show_row_names = TRUE, show_column_names = TRUE,
         add_bg = TRUE, add_reticle = TRUE)
 }
 if (requireNamespace("cluster", quietly = TRUE)) {

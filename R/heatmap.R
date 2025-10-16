@@ -665,41 +665,41 @@ anno_density <- function(x, split_by = NULL, group_by, column, title, which = "r
 
 #' @rdname heatmap-anno
 #' @param alpha A numeric value between 0 and 1 specifying the transparency of the annotation
-anno_simple <- function(x, split_by = NULL, group_by, column, title, which = "row", palette,
+anno_simple <- function(x, split_by = NULL, group_by = NULL, column = NULL, title, which = "row", palette,
                         palcolor = NULL, border = TRUE, legend.direction, show_legend = TRUE, alpha = 1, ...) {
     if (!is.null(split_by)) {
         x <- do.call(rbind, split(x, x[[split_by]]))
     }
-    is_cont <- is.numeric(x[[column]])
-    if (isFALSE(is_cont) && !is.factor(x[[column]])) {
-        x[[column]] <- factor(x[[column]], levels = unique(x[[column]]))
+    if (!is.null(column)) {
+        x <- x[[column]]
+    }
+    is_cont <- is.numeric(x)
+    if (isFALSE(is_cont) && !is.factor(x)) {
+        x <- factor(x, levels = unique(x))
     }
     # add legend
-    if (isTRUE(show_legend)) {
-        if (is_cont) {
-            col_fun <- colorRamp2(
-                seq(min(x[[column]]), max(x[[column]]), length = 100),
-                palette_this(palette = palette, palcolor = palcolor, alpha = alpha)
-            )
-            lgd <- ComplexHeatmap::Legend(
-                title = title,
-                col_fun = col_fun,
-                border = TRUE, direction = legend.direction
-            )
-            anno <- ComplexHeatmap::anno_simple(x[[column]], col = col_fun, which = which, border = border, ...)
-        } else {
-            colors <- palette_this(levels(x[[column]]), palette = palette, palcolor = palcolor, alpha = alpha)
-            lgd <- ComplexHeatmap::Legend(
-                title = title,
-                labels = levels(x[[column]]),
-                legend_gp = gpar(fill = colors),
-                border = TRUE, nrow = if (legend.direction == "horizontal") 1 else NULL
-            )
-            anno <- ComplexHeatmap::anno_simple(as.character(x[[column]]), col = colors, which = which, border = border, ...)
-        }
+    if (is_cont) {
+        col_fun <- colorRamp2(
+            seq(min(x), max(x), length = 100),
+            palette_this(palette = palette, palcolor = palcolor, alpha = alpha)
+        )
+        lgd <- if (isTRUE(show_legend)) ComplexHeatmap::Legend(
+            title = title,
+            col_fun = col_fun,
+            border = TRUE, direction = legend.direction
+        )
+        anno <- ComplexHeatmap::anno_simple(x, col = col_fun, which = which, border = border, ...)
     } else {
-        lgd <- NULL
+        colors <- palette_this(levels(x), palette = palette, palcolor = palcolor, alpha = alpha)
+        lgd <- if (isTRUE(show_legend)) ComplexHeatmap::Legend(
+            title = title,
+            labels = levels(x),
+            legend_gp = gpar(fill = colors),
+            border = TRUE, nrow = if (legend.direction == "horizontal") 1 else NULL
+        )
+        anno <- ComplexHeatmap::anno_simple(as.character(x), col = colors, which = which, border = border, ...)
     }
+
     list(anno = anno, legend = lgd)
 }
 
@@ -776,19 +776,23 @@ layer_reticle <- function(j, i, x, y, w, h, fill, color) {
 #'  create the heatmap itself, which is aggregated data. This dataframe is the original data,
 #'  where each cell could have multiple values.
 #' @param dot_size A numeric value specifying the size of the dot or a function to calculate the size
-#'  from the values in the cell or a function to calculate the size from the values in the cell.
+#'  from the values in the cell. The function can take 1, 3, or 5 arguments: the first argument is
+#'  the values in the cell before aggregation; the 2nd and 3rd arguments are the row and column
+#'  indices; the 4th and 5th arguments are the row and column names.
+#' @param row_names Row names from the heatmap matrix.
+#' @param col_names Column names from the heatmap matrix.
 #' @keywords internal
-layer_dot <- function(j, i, x, y, w, h, fill, data, dot_size, alpha) {
-    if (is.function(dot_size)) {
-        s <- unlist(data[paste(i, j, sep = "-")])
-        s <- scales::rescale(s, to = c(0.1, 1))
+layer_dot <- function(j, i, x, y, w, h, fill, data, dot_size, alpha, row_names = NULL, col_names = NULL) {
+    if (is.numeric(dot_size) && length(dot_size) == 1) {
+        # Simple numeric size
         grid.points(x, y,
-            pch = 21, size = unit(10, "mm") * s,
+            pch = 21, size = unit(dot_size, "mm"),
             gp = gpar(col = "black", lwd = 1, fill = adjcolors(fill, alpha))
         )
     } else {
+        # dot_size is a pre-computed vector/list or will be computed from function
         grid.points(x, y,
-            pch = 21, size = unit(unlist(dot_size), "mm"),
+            pch = 21, size = unit(scales::rescale(unlist(dot_size), to = c(.5, 12)), "mm"),
             gp = gpar(col = "black", lwd = 1, fill = adjcolors(fill, alpha))
         )
     }
@@ -839,13 +843,12 @@ layer_pie <- function(j, i, x, y, w, h, fill, palette, palcolor, data, pie_size)
         pie_sizes <- sapply(data, function(d) pie_size(sum(d$Freq, na.rm = TRUE)))
         pie_sizes <- scales::rescale(pie_sizes, to = c(0.2, 1))
     }
-
+    idx <- which(sapply(pies[[1]]$grobs, function(g) inherits(g, "gTree") && !inherits(g, "zeroGrob") && !inherits(g, "absoluteGrob")))[1]
     for (m in seq_along(pies)) {
-        pies[[m]]$grobs[[5]]$vp <- viewport(x = x[m], y = y[m], width = pie_sizes[m] * w[m], height = pie_sizes[m] * h[m])
-        grid.draw(pies[[m]]$grobs[[5]])
+        pies[[m]]$grobs[[idx]]$vp <- viewport(x = x[m], y = y[m], width = pie_sizes[m] * w[m], height = pie_sizes[m] * h[m])
+        grid.draw(pies[[m]]$grobs[[idx]])
     }
 }
-
 
 #' @rdname heatmap-layer
 #' @param colors A character vector specifying the fill color of the violin plot.
@@ -857,11 +860,12 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
         p <- fn(data.frame(x = 1, y = vlndata[[m]]), x = "x", y = "y", palcolor = colors %||% fill[m], flip = flip)
         ggplotGrob(p + theme_void() + theme(legend.position = "none"))
     })
+    idx <- which(sapply(vlnplots[[1]]$grobs, function(g) inherits(g, "gTree") && !inherits(g, "zeroGrob") && !inherits(g, "absoluteGrob")))[1]
     for (m in seq_along(vlnplots)) {
         wm <- if (flip) w[m] * 0.95 else w[m]
         hm <- if (flip) h[m] * 0.95 else h[m]
-        vlnplots[[m]]$grobs[[5]]$vp <- viewport(x = x[m], y = y[m], width = wm, height = hm)
-        grid.draw(vlnplots[[m]]$grobs[[5]])
+        vlnplots[[m]]$grobs[[idx]]$vp <- viewport(x = x[m], y = y[m], width = wm, height = hm)
+        grid.draw(vlnplots[[m]]$grobs[[idx]])
     }
 }
 
@@ -932,6 +936,7 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #' the fourth and fifth arguments are the row and column names.
 #' The function should return a character vector of the same length as the aggregated values.
 #' If the function returns NA, no label will be shown for that cell.
+#' For the indices, if you have the same dimension of data (same order of rows and columns) as the heatmap, you need to use `ComplexHeatmap::pindex()` to get the correct values.
 #' @param layer_fun_callback A function to add additional layers to the heatmap.
 #'  The function should have the following arguments: `j`, `i`, `x`, `y`, `w`, `h`, `fill`, `sr` and `sc`.
 #'  Please also refer to the `layer_fun` argument in `ComplexHeatmap::Heatmap`.
@@ -969,7 +974,8 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #'  Could be a list with the keys as the names of the annotation and the values as the types.
 #'  If the type is "auto", the type will be determined by the type and number of the column data.
 #' @param column_annotation_params A list of parameters passed to the annotation function.
-#'  Could be a list with the keys as the names of the annotation and the values as the parameters.
+#'  Could be a list with the keys as the names of the annotation and the values as the parameters passed to the annotation function. For the parameters for names (columns_by, rows_by, columns_split_by, rows_split_by), the key should be "name.(name)", where `(name)` is the name of the annotation.
+#'  See [anno_pie()], [anno_ring()], [anno_bar()], [anno_violin()], [anno_boxplot()], [anno_density()], [anno_simple()], [anno_points()] and [anno_lines()] for the parameters of each annotation function.
 #' @param column_annotation_agg A function to aggregate the values in the column annotation.
 #' @param row_name_annotation A logical value indicating whether to add the row annotation for the row names.
 #'  which is a simple annotaion indicating the row names.
@@ -989,6 +995,7 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #' If the type is "auto", the type will be determined by the type and number of the row data.
 #' @param row_annotation_params A list of parameters passed to the annotation function.
 #' Could be a list with the keys as the names of the annotation and the values as the parameters.
+#' Same as `column_annotation_params`.
 #' @param row_annotation_agg A function to aggregate the values in the row annotation.
 #' @param add_reticle A logical value indicating whether to add a reticle to the heatmap.
 #' @param reticle_color A character string specifying the color of the reticle.
@@ -1004,7 +1011,7 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #' @importFrom dplyr group_by across ungroup %>% all_of summarise first slice_sample everything group_map
 #' @importFrom tidyr pivot_longer pivot_wider unite expand_grid
 #' @importFrom ggplot2 ggplotGrob theme_void
-#' @importFrom grid grid.rect grid.text grid.lines grid.points viewport gpar unit grid.draw
+#' @importFrom grid grid.rect grid.text grid.lines grid.points viewport gpar unit grid.draw is.unit
 #' @importFrom grid convertUnit grid.grabExpr
 #' @return A drawn HeatmapList object if `return_grob = FALSE`. Otherwise, a grob/gTree object.
 #' @keywords internal
@@ -1147,8 +1154,6 @@ HeatmapAtomic <- function(
     # rows_split_by1 rows_by1 0.1                            0.2                            ...
     # rows_split_by2 rows_by2 0.3                            0.4                            ...
     # ...
-    # Make sure the rows/columns are in order
-    data <- arrange(data, !!!syms(unique(c(rows_split_by, rows_by, columns_split_by, columns_by, pie_group_by))))
     hmargs$matrix <- data %>%
         group_by(!!!syms(unique(c(rows_split_by, rows_by, columns_split_by, columns_by)))) %>%
         summarise(.value = cell_agg(!!sym(values_by)), .groups = "drop") %>%
@@ -1165,6 +1170,22 @@ HeatmapAtomic <- function(
     hmargs$matrix$.rows <- NULL
     hmargs$matrix <- as.matrix(hmargs$matrix)
     hmargs$matrix[is.na(hmargs$matrix)] <- values_fill
+
+    columns_order <- data %>%
+        tidyr::expand(!!!syms(unique(c(columns_split_by, columns_by)))) %>%
+        unite(".columns", !!!syms(unique(c(columns_split_by, columns_by))), sep = " // ") %>%
+        dplyr::pull(".columns") %>%
+        unique() %>%
+        intersect(colnames(hmargs$matrix))
+    rows_order <- data %>%
+        tidyr::expand(!!!syms(unique(c(rows_split_by, rows_by)))) %>%
+        unite(".rows", !!!syms(unique(c(rows_split_by, rows_by))), sep = " // ") %>%
+        dplyr::pull(".rows") %>%
+        unique() %>%
+        intersect(rownames(hmargs$matrix))
+
+    hmargs$matrix <- hmargs$matrix[rows_order, columns_order, drop = FALSE]
+
     if (flip) {
         hmargs$matrix <- t(hmargs$matrix)
     }
@@ -1360,15 +1381,50 @@ HeatmapAtomic <- function(
                 dot_size <- match.fun(dot_size)
             }
         }
+        # Store raw values for each cell to pass to dot_size function later
         dot_data <- data %>%
             group_by(!!!syms(unique(c(rows_split_by, rows_by, columns_split_by, columns_by)))) %>%
-            group_map(~ if (is.function(dot_size)) dot_size(.x[[values_by]]) else dot_size)
+            summarise(.value = list(!!sym(values_by)), .groups = "drop") %>%
+            unite(".columns", !!!syms(unique(c(columns_split_by, columns_by))), sep = " // ") %>%
+            unite(".rows", !!!syms(unique(c(rows_split_by, rows_by))), sep = " // ") %>%
+            pivot_wider(names_from = ".columns", values_from = ".value") %>%
+            select(-!!sym(".rows")) %>%
+            as.data.frame()
 
-        names(dot_data) <- indices
+        if (flip) {
+            dot_data <- t(dot_data)
+        }
 
         if (!identical(legend.position, "none") && is.function(dot_size) && !is.null(dot_size_name)) {
-            dot_size_min <- min(unlist(dot_data), na.rm = TRUE)
-            dot_size_max <- max(unlist(dot_data), na.rm = TRUE)
+            # Optimized: only compute min/max for legend, not all sizes
+            nargs <- length(formalArgs(dot_size))
+            dot_size_min <- Inf
+            dot_size_max <- -Inf
+
+            for (idx in seq_along(indices)) {
+                cell_key <- indices[idx]
+                # Parse indices from the key "i-j"
+                ij <- as.integer(strsplit(cell_key, "-")[[1]])
+                cell_values <- dot_data[ij[1], ij[2]][[1]]
+
+                size_val <- if (nargs == 1 || is.primitive(dot_size)) {
+                    dot_size(cell_values)
+                } else if (nargs == 3) {
+                    dot_size(cell_values, ij[1], ij[2])
+                } else if (nargs == 5) {
+                    dot_size(cell_values, ij[1], ij[2],
+                             rownames(hmargs$matrix)[ij[1]],
+                             colnames(hmargs$matrix)[ij[2]])
+                } else {
+                    stop("[Heatmap] 'dot_size' function should take 1, 3 or 5 arguments.")
+                }
+
+                if (is.finite(size_val)) {
+                    if (size_val < dot_size_min) dot_size_min <- size_val
+                    if (size_val > dot_size_max) dot_size_max <- size_val
+                }
+            }
+
             legends$.dot_size <- ComplexHeatmap::Legend(
                 title = dot_size_name,
                 labels = scales::number((seq(dot_size_min, dot_size_max, length.out = ifelse(dot_size_max > dot_size_min, 4, 1)))),
@@ -1383,6 +1439,7 @@ HeatmapAtomic <- function(
                 direction = legend.direction
             )
         }
+
         hmargs$layer_fun <- function(j, i, x, y, w, h, fill, sr, sc) {
             layer_white_bg(j, i, x, y, w, h, fill)
             if (isTRUE(add_bg)) {
@@ -1391,10 +1448,34 @@ HeatmapAtomic <- function(
             if (isTRUE(add_reticle)) {
                 layer_reticle(j, i, x, y, w, h, fill, color = reticle_color)
             }
-            layer_dot(
-                j, i, x, y, w, h, fill,
-                data = dot_data, dot_size = dot_size, alpha = alpha
-            )
+            # Compute dot sizes based on function arguments
+            if (is.function(dot_size)) {
+                nargs <- length(formalArgs(dot_size))
+                sizes <- numeric(length(i))
+                for (idx in seq_along(i)) {
+                    cell_values <- dot_data[[i[idx], j[idx]]]
+                    if (nargs == 1 || is.primitive(dot_size)) {
+                        sizes[idx] <- dot_size(cell_values)
+                    } else if (nargs == 3) {
+                        sizes[idx] <- dot_size(cell_values, i[idx], j[idx])
+                    } else if (nargs == 5) {
+                        sizes[idx] <- dot_size(cell_values, i[idx], j[idx],
+                                               rownames(hmargs$matrix)[i[idx]],
+                                               colnames(hmargs$matrix)[j[idx]])
+                    } else {
+                        stop("[Heatmap] 'dot_size' function should take 1, 3 or 5 arguments.")
+                    }
+                }
+                layer_dot(
+                    j, i, x, y, w, h, fill,
+                    data = dot_data, dot_size = sizes, alpha = alpha
+                )
+            } else {
+                layer_dot(
+                    j, i, x, y, w, h, fill,
+                    data = dot_data, dot_size = dot_size, alpha = alpha
+                )
+            }
             if (is.function(layer_fun_callback)) {
                 layer_fun_callback(j, i, x, y, w, h, fill, sr, sc)
             }
@@ -1512,46 +1593,60 @@ HeatmapAtomic <- function(
 
     ## Set up the top annotations
     setup_name_annos <- function(
-        names_side, anno_title, show_names,
+        names_side, anno_title, show_names, params, which,
         split_by, splits, split_palette, split_palcolor,
         by, by_name_annotation, by_labels, by_palette, by_palcolor, by_name_legend
     ) {
         annos <- list(
-            border = TRUE, col = list(),
             annotation_name_side = names_side,
-            show_annotation_name = list(), show_legend = FALSE
+            show_annotation_name = list()
         )
-
         if (!is.null(split_by)) {
-            annos[[split_by]] <- splits
-            annos$col[[split_by]] <- palette_this(
-                unique(splits), palette = split_palette, palcolor = split_palcolor
-            )
+            param <- params[[paste0("name.", split_by)]] %||% list()
+            param$x <- splits
+            param$title <- split_by
+            param$palette <- split_palette
+            param$palcolor <- split_palcolor
+            param$border <- param$border %||% TRUE
+            param$legend.direction <- legend.direction
+            param$which <- ifelse(flip, setdiff(c("column", "row"), which), which)
+            param$show_legend <- is.null(anno_title) && !identical(legend.position, "none")
+            worh <- ifelse(param$which == "row", "width", "height")
+            param[[worh]] <- param[[worh]] %||% unit(2.5, "mm")
+            if (is.numeric(param[[worh]]) && !is.unit(param[[worh]])) {
+                param[[worh]] <- unit(param[[worh]], "mm")
+            }
+
             annos$show_annotation_name[[split_by]] <- TRUE
-            if (is.null(anno_title) && !identical(legend.position, "none")) {
-                legends[[paste0("name.", split_by)]] <<- ComplexHeatmap::Legend(
-                    title = split_by,
-                    labels = unique(splits),
-                    legend_gp = gpar(fill = annos$col[[split_by]]),
-                    border = TRUE, nrow = if (legend.direction == "horizontal") 1 else NULL
-                )
+            anno_legend <- do.call(anno_simple, param)
+            annos[[split_by]] <- anno_legend$anno
+            if (isTRUE(param$show_legend)) {
+                legends[[paste0("name.", split_by)]] <<- anno_legend$legend
             }
         }
 
         if (!is.null(by) && by_name_annotation) {
-            annos[[by]] <- by_labels
-            annos$col[[by]] <- palette_this(
-                unique(by_labels), palette = by_palette, palcolor = by_palcolor
-            )
+            param <- params[[paste0("name.", by)]] %||% list()
+            param$x <- by_labels
+            param$title <- by
+            param$palette <- by_palette
+            param$palcolor <- by_palcolor
+            param$border <- param$border %||% TRUE
+            param$legend.direction <- legend.direction
+            param$which <- ifelse(flip, setdiff(c("column", "row"), which), which)
+            param$show_legend <- !identical(legend.position, "none") &&
+                (isTRUE(by_name_legend) || (is.null(by_name_legend) && !show_names))
+            worh <- ifelse(param$which == "row", "width", "height")
+            param[[worh]] <- param[[worh]] %||% unit(2.5, "mm")
+            if (is.numeric(param[[worh]]) && !is.unit(param[[worh]])) {
+                param[[worh]] <- unit(param[[worh]], "mm")
+            }
+
             annos$show_annotation_name[[by]] <- TRUE
-            if (!identical(legend.position, "none") &&
-                (isTRUE(by_name_legend) || (is.null(by_name_legend) && !show_names))) {
-                legends[[paste0("name.", by)]] <<- ComplexHeatmap::Legend(
-                    title = by,
-                    labels = unique(by_labels),
-                    legend_gp = gpar(fill = annos$col[[by]]),
-                    border = TRUE, nrow = if (legend.direction == "horizontal") 1 else NULL
-                )
+            anno_legend <- do.call(anno_simple, param)
+            annos[[by]] <- anno_legend$anno
+            if (isTRUE(param$show_legend)) {
+                legends[[paste0("name.", by)]] <<- anno_legend$legend
             }
         }
 
@@ -1660,7 +1755,7 @@ HeatmapAtomic <- function(
         ifelse(is.null(columns_by) || !column_name_annotation, 0, 1)
     top_annos <- setup_name_annos(
         names_side = ifelse(flip, column_names_side, row_names_side), anno_title = column_title,
-        show_names = show_column_names,
+        show_names = show_column_names, params = column_annotation_params, which = "column",
         split_by = columns_split_by, splits = if (flip) hmargs$row_split else hmargs$column_split,
         split_palette = columns_split_palette, split_palcolor = columns_split_palcolor,
         by = columns_by, by_name_annotation = column_name_annotation,
@@ -1701,7 +1796,7 @@ HeatmapAtomic <- function(
         ifelse(is.null(rows_by) || !row_name_annotation, 0, 1)
     left_annos <- setup_name_annos(
         names_side = ifelse(flip, row_names_side, column_names_side), anno_title = row_title,
-        show_names = show_row_names,
+        show_names = show_row_names, params = row_annotation_params, which = "row",
         split_by = rows_split_by, splits = if (flip) hmargs$column_split else hmargs$row_split,
         split_palette = rows_split_palette, split_palcolor = rows_split_palcolor,
         by = rows_by, by_name_annotation = row_name_annotation,
@@ -1780,6 +1875,19 @@ HeatmapAtomic <- function(
             ))
         }
     } else {
+        # When return_grob = FALSE (ggplot2 v4), ComplexHeatmap::draw() will render
+        # to the graphics device. To prevent unwanted output during assignment while
+        # still allowing proper display when explicitly printed, we capture to a
+        # null device first, then return the HeatmapList which can be drawn later.
+        current_dev <- grDevices::dev.cur()
+        null_dev <- grDevices::pdf(NULL)
+        on.exit({
+            grDevices::dev.off()  # Close the null device
+            if (current_dev > 1) {
+                grDevices::dev.set(current_dev)  # Restore the previous device if it wasn't null
+            }
+        }, add = TRUE)
+
         if (identical(legend.position, "none")) {
             p <- ComplexHeatmap::draw(p,
                 annotation_legend_list = legends,
@@ -1890,7 +1998,7 @@ HeatmapAtomic <- function(
 #'         values_by = "Players", legend_discrete = TRUE,
 #'         legend_items = c("Player 1" = 0, "Player 2" = 1),
 #'         # Set the pawns
-#'         cell_type = "dot", dot_size = function(x) ifelse(is.na(x), 0, 1),
+#'         cell_type = "dot", dot_size = function(x) ifelse(is.na(x), 0, 10),
 #'         dot_size_name = NULL,  # hide the dot size legend
 #'         palcolor = c("white", "black"),
 #'         # Set the board
@@ -1899,10 +2007,11 @@ HeatmapAtomic <- function(
 #'         width = ggplot2::unit(105, "mm"), height = ggplot2::unit(105, "mm"))
 #' }
 #' if (requireNamespace("cluster", quietly = TRUE)) {
-#'    # Make the row/column name annotation thinner
-#'    Heatmap(matrix_data,
-#'        column_annotation = list(simple_anno_size = ggplot2::unit(2, "mm")),
-#'        row_annotation = list(simple_anno_size = ggplot2::unit(2, "mm")))
+#'     # Make the row/column name annotation thicker
+#'     Heatmap(matrix_data,
+#'         # Use the "name." prefix
+#'         column_annotation_params = list(name.columns = list(height = 5)),
+#'         row_annotation_params = list(name.rows = list(width = 5)))
 #' }
 #'
 #' # Use long form data
@@ -1936,8 +2045,21 @@ HeatmapAtomic <- function(
 #'         cell_type = "bars")
 #' }
 #' if (requireNamespace("cluster", quietly = TRUE)) {
-#'     Heatmap(data, values_by = "value", rows_by = "r", columns_by = "c",
+#'     p <- Heatmap(data, values_by = "value", rows_by = "r", columns_by = "c",
 #'         cell_type = "dot", dot_size = length, dot_size_name = "data points",
+#'         add_bg = TRUE, add_reticle = TRUE)
+#'     p
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
+#'     dot_size_data <- p@data
+#'     # Make it big so we can see if we get the right indexing
+#'     # for dot_size function
+#'     dot_size_data["A", "a"] <- max(dot_size_data) * 2
+#'
+#'     Heatmap(data, values_by = "value", rows_by = "r", columns_by = "c",
+#'         cell_type = "dot", dot_size_name = "data points",
+#'         dot_size = function(x, i, j) ComplexHeatmap::pindex(dot_size_data, i, j),
+#'         show_row_names = TRUE, show_column_names = TRUE,
 #'         add_bg = TRUE, add_reticle = TRUE)
 #' }
 #' if (requireNamespace("cluster", quietly = TRUE)) {
@@ -2069,7 +2191,8 @@ Heatmap <- function(
     legend.direction <- check_legend(legend.direction, names(hmdata$data), "legend.direction")
     legend.position <- check_legend(legend.position, names(hmdata$data), "legend.position")
 
-    return_grob <- utils::compareVersion(as.character(utils::packageVersion("ggplot2")), "4") < 0 || length(hmdata$data) > 1
+    ggplot2_v4 <- utils::compareVersion(as.character(utils::packageVersion("ggplot2")), "4") >= 0
+    return_grob <- !ggplot2_v4 || length(hmdata$data) > 1
 
     plots <- lapply(
         names(hmdata$data), function(nm) {
@@ -2139,5 +2262,11 @@ Heatmap <- function(
     if (length(plots) == 1) {
         attr(p, "data") <- attr(plots[[1]], "data")
     }
+
+    # Return the plot object
+    # When return_grob = FALSE, p is a HeatmapList object with auto-printing behavior
+    # The initial draw() in HeatmapAtomic was captured to a null device to prevent
+    # printing during assignment, so this returned object can print normally when
+    # called directly (e.g., in a Jupyter cell)
     p
 }
