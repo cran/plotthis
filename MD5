@@ -1,4 +1,4 @@
-9bdd450c3296f9ddc416ab950bea789e *DESCRIPTION
+9ae797b0e516a8e4699dfb3c237e3c66 *DESCRIPTION
 655fa400b508366b9a6382c5c61a1f98 *NAMESPACE
 9e6fa3ef7a7014d0ee7a73548c01727c *R/areaplot.R
 0e2ba2b46d1aaaa91fb14f6ab5e0b017 *R/barplot.R
@@ -12,7 +12,7 @@ e9fb8368e0ac3ebb95ed157e23934ee1 *R/densityplot.R
 82daae0786f0ed162061a504a65c0845 *R/dimplot.R
 fe85dfd012dac3cf2c649f151213a8f7 *R/dotplot.R
 5de11684489bb299961d521a0e396842 *R/enrich.R
-a698d67e898f8ccdd0bf4e7129a117f0 *R/gsea.R
+41cf060ceed89dd1cdfb0039338081f7 *R/gsea.R
 f81d91d89259ee5148fd9347a45b8aac *R/heatmap.R
 5a28b02931043a5b9579a3e60705e0af *R/jitterplot.R
 c1ed0d1661d16deb71580b37e5a4ad9e *R/lineplot.R
