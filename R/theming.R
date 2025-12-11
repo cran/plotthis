@@ -12,6 +12,7 @@
 #' If not specified, it will use the value from `getOption("theme_this.font_family")`.
 #' If you want to change the default font family, you can set the option `theme_this.font_family`.
 #' This is applied to all plots using this theme.
+#' To list available font families, you can use the `systemfonts::system_fonts()` function.
 #' @param ... Other arguments for `theme()`
 #'
 #' @return A ggplot2 theme
@@ -237,8 +238,6 @@ palette_this <- function(
     if (all(palcolor == "")) {
         palcolor <- palette_list[[palette]]
     }
-    # print(palcolor)
-    # return()
     if (is.null(palcolor) || length(palcolor) == 0) {
         palcolor <- palette_list[[palette]]
     }
@@ -262,7 +261,7 @@ palette_this <- function(
             )
             palcolor[names(mypal)] <- mypal
             # already reversed, specified palcolor won't be reversed
-            reverse = FALSE
+            reverse <- FALSE
         } else if (length(mypal) == length(x)) {
             palcolor <- mypal
         }
@@ -482,7 +481,8 @@ show_palettes <- function(palettes = NULL, type = c("discrete", "continuous"), i
 #' @return A ggplot2 theme element that can be used inside a [ggplot2::theme()] call.
 #' @export
 #' @importFrom grid unit
-element_textbox <- function (family = NULL, face = NULL, size = NULL, colour = NULL,
+element_textbox <- function(
+    family = NULL, face = NULL, size = NULL, colour = NULL,
     fill = NULL, box.colour = NULL, linetype = NULL, linewidth = NULL,
     hjust = NULL, vjust = NULL, halign = NULL, valign = NULL,
     lineheight = NULL, margin = NULL, padding = NULL, width = NULL,
@@ -496,6 +496,7 @@ element_textbox <- function (family = NULL, face = NULL, size = NULL, colour = N
     if (!is.null(box.color)) {
         box.colour <- box.color
     }
+    family <- family %||% getOption("theme_this.font_family")
     structure(
         list(
             family = family, face = face, size = size, colour = colour, fill = fill, box.colour = box.colour,

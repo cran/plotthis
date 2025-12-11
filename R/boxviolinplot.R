@@ -150,6 +150,8 @@ BoxViolinPlotAtomic <- function(
     )
     facet_by <- check_columns(data, facet_by, force_factor = TRUE, allow_multi = TRUE)
     paired_by <- check_columns(data, paired_by, force_factor = TRUE)
+    base_size <- theme_args$base_size %||% 12
+    sig_labelsize <- sig_labelsize * base_size / 12
     if (!is.null(paired_by)) {
         if (!isTRUE(add_point)) {
             warning("Forcing 'add_point' = TRUE when 'paired_by' is provided.")
@@ -532,9 +534,9 @@ BoxViolinPlotAtomic <- function(
                 y_max_use <- layer_scales(p)$y$range$range[2]
             }
         } else if (!isTRUE(multiplegroup_comparisons)) {
-            if (!is.null(group_by)) {
-                stop("`comparisons` can only be used when `group_by` is NULL is TRUE.")
-            }
+            # if (!is.null(group_by)) {
+            #     stop("`comparisons` can only be used when `group_by` is NULL is TRUE.")
+            # }
             # Convert comparisons to indices
             comparisons <- lapply(
                 comparisons,
@@ -593,6 +595,10 @@ BoxViolinPlotAtomic <- function(
 
                     for (xval in names(xdata)) {
                         df <- xdata[[xval]]
+                        if (nrow(df) < 2) {
+                            xdata[[xval]] <- df
+                            next
+                        }
                         yval <- df[[y]]
 
                         # Handle all NA cases
