@@ -48,6 +48,4 @@ show_palettes(
 }
 \seealso{
 \code{\link{palette_list}}
-
-\href{../articles/all-palettes.html}{All available palettes}
 }
