@@ -42,7 +42,6 @@
 #' @param links_palcolor A character vector to specify the colors of links fill.
 #' @param links_alpha A numeric value to specify the transparency of links fill.
 #' @param legend.box A character string to specify the box of the legend, either "vertical" or "horizontal".
-#' @param keep_empty A logical value to keep the empty nodes.
 #' @param flip A logical value to flip the plot.
 #' @param ... Other arguments to pass to [ggalluvial::geom_alluvium] or [ggalluvial::geom_flow].
 #' @return A ggplot object
@@ -470,6 +469,7 @@ SankeyPlot <- function(
     split_by <- check_columns(data, split_by, force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = split_by_sep)
 
     if (!is.null(split_by)) {
+        data[[split_by]] <- droplevels(data[[split_by]])
         datas <- split(data, data[[split_by]])
         # keep the order of levels
         datas <- datas[levels(data[[split_by]])]

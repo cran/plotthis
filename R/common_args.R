@@ -12,11 +12,27 @@
 #' @param group_by_sep The separator for multiple group_by columns. See \code{group_by}
 #' @param split_by The column(s) to split data by and plot separately.
 #' @param split_by_sep The separator for multiple split_by columns. See \code{split_by}
-#' @param keep_empty A logical value indicating whether to keep empty groups.
-#'   If FALSE, empty groups will be removed.
+#' @param keep_na A logical value or a character to replace the NA values in the data.
+#'   It can also take a named list to specify different behavior for different columns.
+#'   If TRUE or NA, NA values will be replaced with NA.
+#'   If FALSE, NA values will be removed from the data before plotting.
+#'   If a character string is provided, NA values will be replaced with the provided string.
+#'   If a named vector/list is provided, the names should be the column names to apply the behavior to,
+#'   and the values should be one of TRUE, FALSE, or a character string.
+#'   Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+#'   for example, the `x`, `group_by`, `fill_by`, etc.
+#' @param keep_empty One of FALSE, TRUE and "level". It can also take a named list to specify
+#' different behavior for different columns. Without a named list, the behavior applies to the
+#' categorical/character columns used on the plot, for example, the `x`, `group_by`, `fill_by`, etc.
+#' \itemize{
+#'   \item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+#'   \item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+#'   \item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+#'     But they will be assigned colors from the palette to maintain consistency across multiple plots.
+#'    Alias: \code{levels}}
+#' }
 #' @param theme A character string or a theme class (i.e. ggplot2::theme_classic) specifying the theme to use.
 #'   Default is "theme_this".
-#'
 #' @param theme_args A list of arguments to pass to the theme function.
 #' @param palette A character string specifying the palette to use.
 #'   A named list or vector can be used to specify the palettes for different `split_by` values.
@@ -100,11 +116,12 @@ validate_common_args <- function(
     facet_nrow = NULL,
     facet_ncol = NULL,
     facet_byrow = TRUE,
-    theme = "theme_scp",
+    theme = "theme_this",
     theme_args = list(),
     palette = NULL,
     palcolor = NULL,
     expand = NULL,
+    keep_na = FALSE,
     keep_empty = FALSE,
     alpha = 1,
     x_text_angle = 0,
@@ -129,4 +146,6 @@ validate_common_args <- function(
     if (length(facet_by) > 2) {
         stop("Too many columns specified in 'facet_by', only up to 2 columns are allowed.")
     }
+
+    invisible(NULL)
 }

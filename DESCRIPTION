@@ -1,7 +1,7 @@
 Package: plotthis
 Title: High-Level Plotting Built Upon 'ggplot2' and Other Plotting
         Packages
-Version: 0.9.3
+Version: 0.10.0
 Authors@R: 
     person("Panwen", "Wang", , "pwwang@pwwang.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4614-8970"))
@@ -30,8 +30,8 @@ Suggests: testthat, Matrix, alluvial, datasets, ComplexHeatmap,
 LazyData: true
 Config/Needs/website: rmarkdown
 NeedsCompilation: no
-Packaged: 2026-01-09 15:40:02 UTC; pwwang
+Packaged: 2026-02-06 21:55:32 UTC; pwwang
 Author: Panwen Wang [aut, cre] (ORCID: <https://orcid.org/0000-0002-4614-8970>)
 Maintainer: Panwen Wang <pwwang@pwwang.com>
 Repository: CRAN
-Date/Publication: 2026-01-09 16:20:02 UTC
+Date/Publication: 2026-02-06 22:20:03 UTC

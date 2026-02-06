@@ -33,6 +33,7 @@ AreaPlot(
   subtitle = NULL,
   xlab = NULL,
   ylab = NULL,
+  keep_na = FALSE,
   keep_empty = FALSE,
   seed = 8525,
   combine = TRUE,
@@ -117,8 +118,26 @@ This is useful when split_by is used and the title needs to be dynamic.}
 
 \item{ylab}{A character string specifying the y-axis label.}
 
-\item{keep_empty}{A logical value indicating whether to keep empty groups.
-If FALSE, empty groups will be removed.}
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
+
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
 
 \item{seed}{The random seed to use. Default is 8525.}
 
@@ -171,6 +190,8 @@ A plot showing how one or more groups' numeric values change over the
 progression of a another variable
 }
 \examples{
+\donttest{
+set.seed(8525)
 data <- data.frame(
     x = rep(c("A", "B", "C", "D"), 2),
     y = c(1, 3, 6, 4, 2, 5, 7, 8),
@@ -185,4 +206,23 @@ AreaPlot(data, x = "x", y = "y", split_by = "group", palette = c(F1 = "Blues", F
 AreaPlot(data, x = "x", y = "y", group_by = "group", split_by = "split",
     legend.direction = c(X = "horizontal", Y = "vertical"),
     legend.position = c(X = "top", Y = "right"))
+
+# How keep_na and keep_empty work
+data <- data.frame(
+    x = factor(rep(c("A", NA, "C", "D"), 3), levels = c("A", "B", "C", "D")),
+    y = c(1, 3, 6, 4, 2, 5, 7, 8, 4, 2, 3, 5),
+    group = factor(sample(rep(c("F1", NA, "F3"), each = 4)), levels = c("F1", "F2", "F3")),
+    split = factor(sample(rep(c("X", "Y", NA), 4)), levels = c("X", "Y", "Z")),
+    facet = factor(sample(rep(c("M", "N", NA), 4)), levels = c("M", "N", "O"))
+)
+
+AreaPlot(data, x = "x", y = "y", group_by = "group")
+AreaPlot(data, x = "x", y = "y", group_by = "group", keep_na = TRUE, keep_empty = TRUE)
+AreaPlot(data, x = "x", y = "y", group_by = "group", keep_na = TRUE, keep_empty = "level")
+AreaPlot(data, x = "x", y = "y", group_by = "group", keep_na = FALSE, keep_empty = TRUE)
+AreaPlot(data, x = "x", y = "y", group_by = "group",
+    keep_na = list(x = TRUE, group = FALSE), keep_empty = list(x = FALSE, group = TRUE))
+AreaPlot(data, x = "x", y = "y", group_by = "group",
+    keep_na = list(x = FALSE, group = TRUE), keep_empty = list(x = TRUE, group = FALSE))
+}
 }

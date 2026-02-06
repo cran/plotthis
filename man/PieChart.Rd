@@ -23,13 +23,14 @@ PieChart(
   palcolor = NULL,
   alpha = 1,
   aspect.ratio = 1,
+  keep_na = FALSE,
+  keep_empty = FALSE,
   legend.position = "right",
   legend.direction = "vertical",
   title = NULL,
   subtitle = NULL,
   xlab = NULL,
   ylab = NULL,
-  keep_empty = FALSE,
   combine = TRUE,
   nrow = NULL,
   ncol = NULL,
@@ -52,7 +53,8 @@ A numeric column is expected.
 If NULL, the count of each x column will be used.}
 
 \item{label}{Which column to use as the label. NULL means no label.
-Default is the same as y. If y is NULL, you should use ".y" to specify the count as the label.}
+Default is the same as y. If y is NULL, you should use ".y" to specify the count as the label.
+If TRUE, the y values will be used as the label.}
 
 \item{split_by}{The column(s) to split data by and plot separately.}
 
@@ -91,6 +93,27 @@ If some values are missing, the values from the palette will be used (palcolor w
 
 \item{aspect.ratio}{A numeric value specifying the aspect ratio of the plot.}
 
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
+
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
+
 \item{legend.position}{A character string specifying the position of the legend.
 if \code{waiver()}, for single groups, the legend will be "none", otherwise "right".}
 
@@ -105,9 +128,6 @@ This is useful when split_by is used and the title needs to be dynamic.}
 \item{xlab}{A character string specifying the x-axis label.}
 
 \item{ylab}{A character string specifying the y-axis label.}
-
-\item{keep_empty}{A logical value indicating whether to keep empty groups.
-If FALSE, empty groups will be removed.}
 
 \item{combine}{Whether to combine the plots into one when facet is FALSE. Default is TRUE.}
 
@@ -159,17 +179,26 @@ A ggplot object or wrap_plots object or a list of ggplot objects
 Pie chart to illustrate numerical proportion of each group.
 }
 \examples{
+\donttest{
 data <- data.frame(
-   x = c("A", "B", "C", "D", "E", "F", "G", "H"),
+   x = factor(c("A", "B", "C", NA, "E", "F", "G", "H"), levels = LETTERS[1:8]),
    y = c(10, 8, 16, 4, 6, 12, 14, 2),
-   group = c("G1", "G1", "G2", "G2", "G3", "G3", "G4", "G4"),
-   facet = c("F1", "F2", "F3", "F4", "F1", "F2", "F3", "F4")
+   group = factor(c("G1", "G1", NA, NA, "G3", "G3", "G4", "G4"),
+       levels = c("G1", "G2", "G3", "G4")),
+   facet = factor(c("F1", NA, "F3", "F4", "F1", NA, "F3", "F4"),
+       levels = c("F1", "F2", "F3", "F4"))
 )
-
 PieChart(data, x = "x", y = "y")
+PieChart(data, x = "x", y = "y", keep_na = TRUE, keep_empty = TRUE)
 PieChart(data, x = "x", y = "y", clockwise = FALSE)
+PieChart(data, x = "x", y = "y", clockwise = FALSE,
+         keep_na = TRUE, keep_empty = TRUE)
 PieChart(data, x = "x", y = "y", label = "group")
 PieChart(data, x = "x", y = "y", facet_by = "facet")
+PieChart(data, x = "x", y = "y", facet_by = c("facet", "group"),
+    keep_empty = 'level')
+PieChart(data, x = "x", y = "y", facet_by = c("facet", "group"),
+    keep_empty = TRUE)
 PieChart(data, x = "x", y = "y", split_by = "group")
 PieChart(data, x = "x", y = "y", split_by = "group",
          palette = list(G1 = "Reds", G2 = "Blues", G3 = "Greens", G4 = "Purp"))
@@ -177,5 +206,6 @@ PieChart(data, x = "x", y = "y", split_by = "group",
 # y from count
 PieChart(data, x = "group")
 # add label
-PieChart(data, x = "group", label = ".y")
+PieChart(data, x = "group", label = ".y")  # or label = TRUE
+}
 }

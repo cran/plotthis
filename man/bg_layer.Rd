@@ -7,10 +7,10 @@
 bg_layer(
   data,
   x,
+  keep_empty,
   palette,
   palcolor,
   alpha,
-  keep_empty,
   facet_by,
   direction = "vertical"
 )
@@ -20,13 +20,13 @@ bg_layer(
 
 \item{x}{A character string specifying the column name of the data frame to plot for the x-axis}
 
+\item{keep_empty}{A character string specifying whether to keep empty levels}
+
 \item{palette}{A character string specifying the palette to use}
 
 \item{palcolor}{A character string specifying the color to use in the palette}
 
 \item{alpha}{A numeric value specifying the transparency of the plot}
-
-\item{keep_empty}{A logical value indicating whether to keep empty groups}
 
 \item{facet_by}{A character string specifying the column name(s) of the data frame to facet the plot}
 

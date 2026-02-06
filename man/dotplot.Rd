@@ -45,6 +45,7 @@ DotPlot(
   subtitle = NULL,
   xlab = NULL,
   ylab = NULL,
+  keep_na = FALSE,
   keep_empty = FALSE,
   combine = TRUE,
   nrow = NULL,
@@ -91,6 +92,7 @@ LollipopPlot(
   subtitle = NULL,
   xlab = NULL,
   ylab = NULL,
+  keep_na = FALSE,
   keep_empty = FALSE,
   combine = TRUE,
   nrow = NULL,
@@ -203,8 +205,26 @@ This is useful when split_by is used and the title needs to be dynamic.}
 
 \item{ylab}{A character string specifying the y-axis label.}
 
-\item{keep_empty}{A logical value indicating whether to keep empty groups.
-If FALSE, empty groups will be removed.}
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
+
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
 
 \item{combine}{Whether to combine the plots into one when facet is FALSE. Default is TRUE.}
 
@@ -282,6 +302,12 @@ DotPlot(mtcars, x = "carb", y = "gear", size_by = "wt",
 # works as a scatter plot
 DotPlot(mtcars, x = "qsec", y = "drat", size_by = "wt",
         fill_by = "mpg", fill_cutoff = 18, fill_cutoff_name = "Small mpgs")
+# keep_na and keep_empty
+mtcars$carb[mtcars$carb == "1"] <- NA
+mtcars$gear[mtcars$gear == "3"] <- NA
+DotPlot(mtcars, x = "carb", y = "gear", size_by = "wt",
+        fill_by = "mpg", fill_cutoff = 18,
+        keep_na = TRUE, keep_empty = TRUE)
 }
 LollipopPlot(mtcars, x = "qsec", y = "drat", size_by = "wt",
              fill_by = "mpg")

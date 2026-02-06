@@ -36,6 +36,8 @@ RadarPlotAtomic(
   aspect.ratio = 1,
   legend.position = waiver(),
   legend.direction = "vertical",
+  keep_na = FALSE,
+  keep_empty = FALSE,
   title = NULL,
   subtitle = NULL,
   ...
@@ -124,6 +126,27 @@ When facet_by is a single column and facet_wrap is used.}
 if \code{waiver()}, for single groups, the legend will be "none", otherwise "right".}
 
 \item{legend.direction}{A character string specifying the direction of the legend.}
+
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
+
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
 
 \item{title}{A character string specifying the title of the plot.
 A function can be used to generate the title based on the default title.

@@ -18,9 +18,13 @@ BarPlotSingle(
   label_size = 4,
   label_bg = "white",
   label_bg_r = 0.1,
+  add_bg = FALSE,
+  bg_palette = "stripe",
+  bg_palcolor = NULL,
+  bg_alpha = 0.2,
   theme = "theme_this",
   theme_args = list(),
-  palette = "Paired",
+  palette = NULL,
   palcolor = NULL,
   alpha = 1,
   x_text_angle = 0,
@@ -42,9 +46,11 @@ BarPlotSingle(
   subtitle = NULL,
   xlab = NULL,
   ylab = NULL,
+  keep_na = FALSE,
   keep_empty = FALSE,
   expand = waiver(),
-  fill_by_x = TRUE,
+  fill_by = TRUE,
+  fill_name = NULL,
   width = 0.9,
   ...
 )
@@ -137,8 +143,26 @@ This is useful when split_by is used and the title needs to be dynamic.}
 
 \item{ylab}{A character string specifying the y-axis label.}
 
-\item{keep_empty}{A logical value indicating whether to keep empty groups.
-If FALSE, empty groups will be removed.}
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
+
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
 
 \item{expand}{The values to expand the x and y axes. It is like CSS padding.
 When a single value is provided, it is used for both axes on both sides.
@@ -149,9 +173,6 @@ You can also use a named vector to specify the values for each side.
 When the axis is discrete, the values will be applied as 'add' to the 'expansion' function.
 When the axis is continuous, the values will be applied as 'mult' to the 'expansion' function.
 See also \url{https://ggplot2.tidyverse.org/reference/expansion.html}}
-
-\item{fill_by_x}{A logical value indicating whether to fill the bars by the x-axis values.
-If FALSE, the bars will be filled a single color (the first color in the palette).}
 
 \item{width}{A numeric value specifying the width of the bars.}
 

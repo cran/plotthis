@@ -19,6 +19,7 @@ BoxPlot(
     "median"),
   flip = FALSE,
   keep_empty = FALSE,
+  keep_na = FALSE,
   group_by = NULL,
   group_by_sep = "_",
   group_name = NULL,
@@ -112,6 +113,7 @@ ViolinPlot(
     "median"),
   flip = FALSE,
   keep_empty = FALSE,
+  keep_na = FALSE,
   group_by = NULL,
   group_by_sep = "_",
   group_name = NULL,
@@ -209,6 +211,7 @@ BeeswarmPlot(
     "median"),
   flip = FALSE,
   keep_empty = FALSE,
+  keep_na = FALSE,
   group_by = NULL,
   group_by_sep = "_",
   group_name = NULL,
@@ -332,8 +335,26 @@ In other words, we use the following convention for symbols indicating statistic
 
 \item{flip}{A logical value to flip the plot.}
 
-\item{keep_empty}{A logical value indicating whether to keep empty groups.
-If FALSE, empty groups will be removed.}
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
+
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
 
 \item{group_by}{Columns to group the data for plotting
 For those plotting functions that do not support multiple groups,
@@ -628,6 +649,43 @@ BoxPlot(
     x = "x", y = "value",
     paired_by = "subject", group_by = "group",
     comparisons = TRUE, pt_size = 3, pt_color = "red"
+)
+
+# keep_na and keep_empty example
+data <- data.frame(
+    x = factor(rep(c(LETTERS[1:3], NA, LETTERS[5:8]), each = 40),
+       levels = c(LETTERS[1:8])),
+    y = c(rnorm(160), rnorm(160, mean = 1)),
+    group1 = sample(c("g1", "g2"), 320, replace = TRUE),
+    group2 = factor(sample(c("h1", NA, "h3", "h4"), 320, replace = TRUE),
+       levels = c("h1", "h2", "h3", "h4"))
+)
+
+BoxPlot(data, x = "x", y = "y",
+    title = "keep_na = FALSE; keep_empty = FALSE")
+BoxPlot(data, x = "x", y = "y", keep_na = TRUE, keep_empty = TRUE,
+    title = "keep_na = TRUE; keep_empty = TRUE")
+BoxPlot(data, x = "x", y = "y", keep_na = TRUE, keep_empty = TRUE,
+    title = "keep_na = TRUE; keep_empty = TRUE", facet_by = "group2")
+BoxPlot(data, x = "x", y = "y", keep_na = TRUE, keep_empty = 'level',
+    title = "keep_na = TRUE; keep_empty = 'level'")
+BoxPlot(data, x = "x", y = "y", group_by = "group2",
+    title = "keep_na = FALSE; keep_empty = FALSE; group_by = 'group2'")
+BoxPlot(data, x = "x", y = "y", group_by = "group2",
+    keep_na = TRUE, keep_empty = TRUE,
+    title = "keep_na = TRUE; keep_empty = TRUE; group_by = 'group2'")
+BoxPlot(data, x = "x", y = "y", group_by = "group2",
+    keep_na = TRUE, keep_empty = 'level',
+    title = "keep_na = TRUE; keep_empty = 'level'; group_by = 'group2'")
+BoxPlot(data, x = "x", y = "y", group_by = "group2",
+    keep_na = list(x = TRUE, group2 = FALSE),
+    keep_empty = list(x = FALSE, group2 = TRUE),
+    title = "keep_na: x=TRUE, group2=FALSE\nkeep_empty: x=FALSE, group2=TRUE"
+)
+BoxPlot(data, x = "x", y = "y", group_by = "group2",
+    keep_na = list(x = FALSE, group2 = TRUE),
+    keep_empty = list(x = TRUE, group2 = FALSE),
+    title = "keep_na: x=FALSE, group2=TRUE\nkeep_empty: x=TRUE, group2=FALSE"
 )
 }
 \donttest{

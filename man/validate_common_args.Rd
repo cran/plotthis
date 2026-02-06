@@ -16,11 +16,12 @@ validate_common_args(
   facet_nrow = NULL,
   facet_ncol = NULL,
   facet_byrow = TRUE,
-  theme = "theme_scp",
+  theme = "theme_this",
   theme_args = list(),
   palette = NULL,
   palcolor = NULL,
   expand = NULL,
+  keep_na = FALSE,
   keep_empty = FALSE,
   alpha = 1,
   x_text_angle = 0,
@@ -88,8 +89,26 @@ When the axis is discrete, the values will be applied as 'add' to the 'expansion
 When the axis is continuous, the values will be applied as 'mult' to the 'expansion' function.
 See also \url{https://ggplot2.tidyverse.org/reference/expansion.html}}
 
-\item{keep_empty}{A logical value indicating whether to keep empty groups.
-If FALSE, empty groups will be removed.}
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
+
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
 
 \item{alpha}{A numeric value specifying the transparency of the plot.}
 

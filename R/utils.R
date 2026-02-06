@@ -318,30 +318,31 @@ combine_plots <- function(
 #' @keywords internal
 #' @param data A data frame
 #' @param x A character string specifying the column name of the data frame to plot for the x-axis
+#' @param keep_empty A character string specifying whether to keep empty levels
 #' @param palette A character string specifying the palette to use
 #' @param palcolor A character string specifying the color to use in the palette
 #' @param alpha A numeric value specifying the transparency of the plot
-#' @param keep_empty A logical value indicating whether to keep empty groups
 #' @param facet_by A character string specifying the column name(s) of the data frame to facet the plot
 #' @param direction A character string specifying the direction for the background
 #' @return A ggplot layer for background
 #' @importFrom ggplot2 geom_rect
 #' @importFrom dplyr distinct
 #' @importFrom tidyr expand_grid
-bg_layer <- function(data, x, palette, palcolor, alpha, keep_empty, facet_by, direction = "vertical") {
-    fct <- data[[x]]
-    if (isFALSE(keep_empty)) {
-        fct <- droplevels(fct)
+bg_layer <- function(data, x, keep_empty, palette, palcolor, alpha, facet_by, direction = "vertical") {
+    if (anyNA(data[[x]])) {
+        randint <- sample.int(1e6, 1)
+        levels(data[[x]]) <- c(levels(data[[x]]), paste0("__NA__", randint))
+        data[[x]][is.na(data[[x]])] <- paste0("__NA__", randint)
     }
-    bg_color <- palette_this(levels(fct), palette = palette, palcolor = palcolor)
-
-    bg_data <- data.frame(x = factor(levels(fct), levels = levels(fct)))
+    lvls <- if (keep_empty) levels(data[[x]]) else levels(droplevels(data[[x]]))
+    bg_color <- palette_this(lvls, palette = palette, palcolor = palcolor)
+    bg_data <- data.frame(x = factor(lvls, levels = lvls))
     bg_data$x <- as.numeric(bg_data$x)
     bg_data$xmin <- ifelse(bg_data$x == min(bg_data$x), -Inf, bg_data$x - 0.5)
     bg_data$xmax <- ifelse(bg_data$x == max(bg_data$x), Inf, bg_data$x + 0.5)
     bg_data$ymin <- -Inf
     bg_data$ymax <- Inf
-    bg_data$fill <- bg_color[levels(fct)]
+    bg_data$fill <- bg_color[lvls]
 
     if (!is.null(facet_by)) {
         unique_facet_values <- distinct(data, !!!syms(facet_by))
@@ -633,4 +634,123 @@ check_legend <- function(legend, datas_name, which = c("legend.position", "legen
     }
 
     return(legend)
+}
+
+
+#' check_keep_na
+#' Check and normalize keep_na parameter
+#' @param keep_na keep_na
+#' @param cols column names if keep_na is a single value
+#' @keywords internal
+#' @return normalized keep_na
+check_keep_na <- function(keep_na, cols = NA) {
+    if (is.character(keep_na) || is.logical(keep_na)) {
+        if (isTRUE(keep_na) || is.na(keep_na)) keep_na <- NA
+        if (is.null(cols) || length(cols) == 0) {
+            # no columns selected
+            return(list())
+        } else if (length(cols) == 1 && is.na(cols)) {
+            return(keep_na)
+        } else {
+            cols <- unique(cols)
+            return(stats::setNames(rep(list(keep_na), length(cols)), cols))
+        }
+    }
+    if (is.null(names(keep_na)) || !is.list(keep_na)) {
+        stop("'keep_na' must be a logical/character or a named list.")
+    }
+    out <- list()
+    if (length(cols) > 1 || (length(cols) == 1 && !is.na(cols))) {
+        cols <- unique(cols)
+        out <- stats::setNames(rep(list(FALSE), length(cols)), cols)
+    }
+    for (name in names(keep_na)) {
+        out[[name]] <- check_keep_na(keep_na[[name]])
+    }
+
+    return(out)
+}
+
+#' check_keep_empty
+#' Check and normalize keep_empty parameter
+#' @param keep_empty keep_empty
+#' @param cols column names if keep_empty is a single value
+#' @keywords internal
+#' @return normalized keep_empty
+check_keep_empty <- function(keep_empty, cols = NA) {
+    if (identical(keep_empty, "levels")) keep_empty <- "level"
+    if (is.character(keep_empty) && !identical(keep_empty, "level")) {
+        stop("'keep_empty' must be one of TRUE/FALSE, 'level', or 'levels'.")
+    }
+    if (!is.list(keep_empty)) {
+        if (is.null(cols) || length(cols) == 0) {
+            # no columns selected
+            return(list())
+        } else if (length(cols) == 1 && is.na(cols)) {
+            return(keep_empty)
+        } else {
+            cols <- unique(cols)
+            return(stats::setNames(rep(list(keep_empty), length(cols)), cols))
+        }
+    }
+    if (is.null(names(keep_empty))) {
+        stop("'keep_empty' must have names when provided as a list.")
+    }
+    out <- list()
+    if (length(cols) > 1 || (length(cols) == 1 && !is.na(cols))) {
+        cols <- unique(cols)
+        out <- stats::setNames(rep(list(FALSE), length(cols)), cols)
+    }
+    for (name in names(keep_empty)) {
+        out[[name]] <- check_keep_empty(keep_empty[[name]])
+    }
+    return(out)
+}
+
+#' process_keep_na_empty
+#' Process keep_na and keep_empty to data
+#' @param data data frame
+#' @param keep_na List of keep_na
+#' @param keep_empty List of keep_empty
+#' @keywords internal
+#' @return processed data frame
+process_keep_na_empty <- function(data, keep_na = NULL, keep_empty = NULL, col = NULL) {
+    if (!is.null(keep_na)) {
+        if (!is.null(col) && col %in% names(keep_na)) {
+            keep_na <- keep_na[col]
+        }
+        for (cl in names(keep_na)) {
+            if (!cl %in% colnames(data)) {
+                warning("Column '", cl, "' not found in data. Skipping 'keep_na' processing for this column.")
+                next
+            }
+            if (!anyNA(data[[cl]])) next
+            if (isFALSE(keep_na[[cl]])) {
+                data <- data[!is.na(data[[cl]]), , drop = FALSE]
+                next
+            }
+            if (is.factor(data[[cl]]) && !is.na(keep_na[[cl]])) {
+                levels(data[[cl]]) <- c(levels(data[[cl]]), keep_na[[cl]])
+            }
+            data[[cl]][is.na(data[[cl]])] <- keep_na[[cl]]
+        }
+    }
+
+    if (!is.null(keep_empty)) {
+        if (!is.null(col) && col %in% names(keep_empty)) {
+            keep_empty <- keep_empty[col]
+        }
+
+        for (cl in names(keep_empty)) {
+            if (!cl %in% colnames(data)) {
+                warning("Column '", cl, "' not found in data. Skipping 'keep_empty' processing for this column.")
+                next
+            }
+            if (!is.factor(data[[cl]])) next
+            if (isFALSE(keep_empty[[cl]])) {
+                data[[cl]] <- droplevels(data[[cl]])
+            }
+        }
+    }
+    return(data)
 }

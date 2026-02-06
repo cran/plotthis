@@ -33,6 +33,8 @@ TrendPlot(
   subtitle = NULL,
   xlab = NULL,
   ylab = NULL,
+  keep_na = FALSE,
+  keep_empty = FALSE,
   seed = 8525,
   combine = TRUE,
   nrow = NULL,
@@ -116,6 +118,27 @@ This is useful when split_by is used and the title needs to be dynamic.}
 
 \item{ylab}{A character string specifying the y-axis label.}
 
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
+
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
+
 \item{seed}{The random seed to use. Default is 8525.}
 
 \item{combine}{Whether to combine the plots into one when facet is FALSE. Default is TRUE.}
@@ -166,17 +189,25 @@ A ggplot object or wrap_plots object or a list of ggplot objects
 A trend plot is like an area plot but with gaps between the bars.
 }
 \examples{
+\donttest{
 data <- data.frame(
-    x = rep(c("A", "B", "C", "D"), 2),
-    y = c(1, 3, 6, 4, 2, 5, 7, 8),
-    group = rep(c("F1", "F2"), each = 4)
+    x = factor(rep(c("A", "B", NA, "D"), 3), levels = LETTERS[1:4]),
+    y = c(1, 3, 6, 5, 4, 2, 5, 7, 8, 9, 4, 8),
+    group = factor(rep(c("F1", NA, "F3"), each = 4), levels = c("F1", "F2", "F3"))
 )
 TrendPlot(data, x = "x", y = "y", group_by = "group")
 TrendPlot(data, x = "x", y = "y", group_by = "group",
          scale_y = TRUE)
 TrendPlot(data, x = "x", y = "y", split_by = "group")
 TrendPlot(data, x = "x", y = "y", split_by = "group",
-          palette = c(F1 = "Set1", F2 = "Paired"))
+          palette = c(F1 = "Set1", F3 = "Dark2"))
+TrendPlot(data, x = "x", y = "y", group_by = "group",
+         keep_na = TRUE, keep_empty = TRUE)
+TrendPlot(data, x = "x", y = "y", group_by = "group",
+         keep_na = TRUE, keep_empty = list(x = FALSE, group = 'level'))
+TrendPlot(data, x = "x", y = "y", facet_by = "group",
+         keep_na = TRUE, keep_empty = list(x = FALSE, group = 'level'))
+}
 }
 \seealso{
 \code{\link{AreaPlot}}

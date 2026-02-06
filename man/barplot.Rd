@@ -12,7 +12,8 @@ BarPlot(
   x_sep = "_",
   y = NULL,
   flip = FALSE,
-  fill_by_x_if_no_group = TRUE,
+  fill_by = TRUE,
+  fill_name = NULL,
   line_name = NULL,
   label_nudge = 0.02,
   label = NULL,
@@ -45,7 +46,7 @@ BarPlot(
   trend_ptsize = 2,
   theme = "theme_this",
   theme_args = list(),
-  palette = "Paired",
+  palette = NULL,
   palcolor = NULL,
   alpha = 1,
   x_text_angle = 0,
@@ -61,6 +62,7 @@ BarPlot(
   xlab = NULL,
   ylab = NULL,
   keep_empty = FALSE,
+  keep_na = FALSE,
   expand = waiver(),
   width = waiver(),
   combine = TRUE,
@@ -93,6 +95,7 @@ SplitBarPlot(
   fill_by = NULL,
   fill_by_sep = "_",
   fill_name = NULL,
+  direction_name = "direction",
   direction_pos_name = "positive",
   direction_neg_name = "negative",
   theme = "theme_this",
@@ -114,6 +117,7 @@ SplitBarPlot(
   xlab = NULL,
   ylab = NULL,
   keep_empty = FALSE,
+  keep_na = FALSE,
   combine = TRUE,
   nrow = NULL,
   ncol = NULL,
@@ -144,6 +148,7 @@ WaterfallPlot(
   fill_by = NULL,
   fill_by_sep = "_",
   fill_name = NULL,
+  direction_name = "direction",
   direction_pos_name = "positive",
   direction_neg_name = "negative",
   theme = "theme_this",
@@ -165,6 +170,7 @@ WaterfallPlot(
   xlab = NULL,
   ylab = NULL,
   keep_empty = FALSE,
+  keep_na = FALSE,
   combine = TRUE,
   nrow = NULL,
   ncol = NULL,
@@ -188,7 +194,13 @@ WaterfallPlot(
 
 \item{flip}{A logical value indicating whether to flip the x and y axes.}
 
-\item{fill_by_x_if_no_group}{A logical value indicating whether to fill the bars by the x-axis values if there is no group_by.}
+\item{fill_by}{A variable used to fill the bars. Both character/factor and numeric columns are accepted.
+If \code{TRUE} (default), the bars will be filled by the x-axis values,
+If \code{FALSE}, the bars will be filled a single color (the first color in the palette).
+ONLY works when \code{group_by} is NULL. When \code{group_by} is not NULL, the bars will be filled by the \code{group_by} variable.}
+
+\item{fill_name}{A character string to specify the name of the fill variable in the legend.
+Only works when \code{fill_by} applies.}
 
 \item{line_name}{A character string indicating the name of the line.}
 
@@ -263,8 +275,9 @@ Default is "theme_this".}
 
 \item{theme_args}{A list of arguments to pass to the theme function.}
 
-\item{palette}{A character string specifying the palette to use.
-A named list or vector can be used to specify the palettes for different \code{split_by} values.}
+\item{palette}{A character string specifying the palette to use for the bars.
+When \code{group_by} is specified, it defaults to "Paired".
+When \code{group_by} is not specified, it defaults to "Spectral" if \code{fill_by} column is numeric, otherwise "Paired".}
 
 \item{palcolor}{A character string specifying the color to use in the palette.
 A named list can be used to specify the colors for different \code{split_by} values.
@@ -301,8 +314,26 @@ This is useful when split_by is used and the title needs to be dynamic.}
 
 \item{ylab}{A character string specifying the y-axis label.}
 
-\item{keep_empty}{A logical value indicating whether to keep empty groups.
-If FALSE, empty groups will be removed.}
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
+
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
 
 \item{expand}{The values to expand the x and y axes. It is like CSS padding.
 When a single value is provided, it is used for both axes on both sides.
@@ -381,11 +412,9 @@ The "*" key is used to order the y axis without considering the direction.}
 
 \item{max_charwidth}{A numeric value indicating the maximum width of the text.}
 
-\item{fill_by}{A character string indicating the column name to use for the fill of the bars.}
-
 \item{fill_by_sep}{A character string to concatenate the fill columns if there are multiple.}
 
-\item{fill_name}{A character string indicating the legend name of the fill.}
+\item{direction_name}{A character string indicating the name of the direction column and will be shown in the legend.}
 
 \item{direction_pos_name}{A character string indicating the name of the positive direction.}
 
@@ -414,7 +443,7 @@ data <- data.frame(
 )
 
 BarPlot(data, x = "x", y = "y")
-BarPlot(data, x = "x", y = "y", fill_by_x_if_no_group = FALSE)
+BarPlot(data, x = "x", y = "y", fill_by = FALSE)
 BarPlot(data, x = "x", y = "y", label = TRUE)
 BarPlot(data, x = "x", y = "y", label = "facet", label_nudge = 0)
 BarPlot(data, x = "group", y = "y", group_by = "x")
@@ -443,7 +472,62 @@ BarPlot(data,
 BarPlot(data, x = "group", ylab = "count")
 # flip the plot
 BarPlot(data, x = "group", flip = TRUE, ylab = "count")
+# Allow numeric fill_by
+BarPlot(data, x = "x", y = "y", fill_by = "y", flip = TRUE)
+
+data <- data.frame(
+    x = factor(c("A", "B", "C", "D", "E", "F", NA, "H"), levels = LETTERS[1:10]),
+    y = c(10, 8, 16, 4, 6, NA, 14, 2),
+    group = factor(c("G1", "G1", "G2", NA, "G3", "G3", "G5", "G5"),
+       levels = c("G1", "G2", "G3", "G4", "G5")),
+    facet = factor(c("F1", NA, "F3", "F4", "F1", "F2", "F3", "F4"),
+       levels = c("F1", "F2", "F3", "F4", "F5"))
+)
+# keep_na and keep_empty on simple barplots
+BarPlot(data, x = "x", y = "y",
+    title = "keep_na = FALSE; keep_empty = FALSE")
+BarPlot(data, x = "x", y = "y",
+    keep_na = TRUE, keep_empty = TRUE,
+    title = "keep_na = TRUE; keep_empty = TRUE")
+BarPlot(data, x = "x", y = "y",
+    keep_na = TRUE, keep_empty = TRUE, facet_by = "facet",
+    title = "keep_na = TRUE; keep_empty = TRUE; facet_by = 'facet'")
+BarPlot(data, x = "x", y = "y",
+    keep_na = TRUE, keep_empty = 'level',
+    title = "keep_na = TRUE; keep_empty = 'level'")
+BarPlot(data, x = "x", y = "y",
+    keep_na = list(x = TRUE), keep_empty = list(x = FALSE),
+    title = "keep_na: x=TRUE\nkeep_empty: x=FALSE"
+)
+
+# keep_na and keep_empty on grouped barplots
+BarPlot(data,
+    x = "group", y = "y", group_by = "x",
+    title = "keep_na = FALSE; keep_empty = FALSE")
+BarPlot(data,
+    x = "group", y = "y", group_by = "x",
+    keep_na = TRUE, keep_empty = TRUE,
+    title = "keep_na = TRUE; keep_empty = TRUE"
+)
+BarPlot(data,
+    x = "group", y = "y", group_by = "x",
+    keep_na = TRUE, keep_empty = TRUE, facet_by = "facet",
+    title = "keep_na = TRUE; keep_empty = TRUE; facet_by = 'facet'"
+)
+BarPlot(data,
+    x = "group", y = "y", group_by = "x",
+    keep_na = TRUE, keep_empty = 'level',
+    title = "keep_na = TRUE; keep_empty = 'level'"
+)
+BarPlot(data,
+    x = "group", y = "y", group_by = "x",
+    keep_na = list(x = TRUE, group = FALSE),
+    keep_empty = list(x = FALSE, group = TRUE),
+    title = "keep_na: x=TRUE, group=FALSE\nkeep_empty: x=FALSE, group=TRUE"
+)
 }
+\donttest{
+set.seed(8525)
 data <- data.frame(
     word = c("apple", "banana", "cherry", "date", "elderberry",
              "It is a very long term with a lot of words"),
@@ -459,4 +543,32 @@ SplitBarPlot(data, x = "count", y = "word", facet_by = "group",
              fill_name = "Direction")
 SplitBarPlot(data, x = "count", y = "word", alpha_by = "score", split_by="group",
              palette = c(A = "Reds", B = "Blues", C = "Greens"))
+
+# test keep_na and keep_empty
+data <- data.frame(
+    word = factor(c("apple", "banana", "cherry", NA, "elderberry",
+         "It is a very long term with a lot of words"),
+         levels = c("apple", "banana", "cherry", "date", "elderberry",
+             "unused", "It is a very long term with a lot of words")),
+    count = c(-10, 20, NA, 40, 10, 34),
+    score = c(1, 2, 3, 4, 5, 3.2),
+    group = factor(sample(c("A", "A", "B", "B", "C", "C")),
+         levels = c("A", "B", "C", "D"))
+)
+
+SplitBarPlot(data, x = "count", y = "word", alpha_by = "score",
+    title = "keep_na = FALSE; keep_empty = FALSE")
+SplitBarPlot(data, x = "count", y = "word", alpha_by = "score",
+    keep_na = TRUE, keep_empty = TRUE,
+    title = "keep_na = TRUE; keep_empty = TRUE")
+SplitBarPlot(data, x = "count", y = "word", alpha_by = "score",
+    keep_na = TRUE, keep_empty = TRUE, facet_by = "group",
+    title = "keep_na = TRUE; keep_empty = TRUE; facet_by = 'group'")
+SplitBarPlot(data, x = "count", y = "word", alpha_by = "score",
+    keep_na = TRUE, keep_empty = "level",
+    title = "keep_na = TRUE; keep_empty = 'level'")
+SplitBarPlot(data, x = "count", y = "word", alpha_by = "score",
+    keep_na = list(word = FALSE), keep_empty = list(word = TRUE),
+    title = "keep_na: word=FALSE; keep_empty: word=TRUE")
+}
 }

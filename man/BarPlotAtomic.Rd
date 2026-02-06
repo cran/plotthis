@@ -14,7 +14,8 @@ BarPlotAtomic(
   group_by = NULL,
   group_by_sep = "_",
   group_name = NULL,
-  fill_by_x_if_no_group = TRUE,
+  fill_by = TRUE,
+  fill_name = NULL,
   label_nudge = 0.02,
   label = NULL,
   label_fg = "black",
@@ -27,7 +28,7 @@ BarPlotAtomic(
   bg_alpha = 0.2,
   theme = "theme_this",
   theme_args = list(),
-  palette = "Paired",
+  palette = NULL,
   palcolor = NULL,
   alpha = 1,
   x_text_angle = 0,
@@ -51,6 +52,7 @@ BarPlotAtomic(
   subtitle = NULL,
   xlab = NULL,
   ylab = NULL,
+  keep_na = FALSE,
   keep_empty = FALSE,
   expand = waiver(),
   width = waiver(),
@@ -85,7 +87,13 @@ They will be concatenated into one column, using \code{group_by_sep} as the sepa
 
 \item{group_name}{A character string to specify the name of the group_by in the legend.}
 
-\item{fill_by_x_if_no_group}{A logical value indicating whether to fill the bars by the x-axis values if there is no group_by.}
+\item{fill_by}{A variable used to fill the bars. Both character/factor and numeric columns are accepted.
+If \code{TRUE} (default), the bars will be filled by the x-axis values,
+If \code{FALSE}, the bars will be filled a single color (the first color in the palette).
+ONLY works when \code{group_by} is NULL. When \code{group_by} is not NULL, the bars will be filled by the \code{group_by} variable.}
+
+\item{fill_name}{A character string to specify the name of the fill variable in the legend.
+Only works when \code{fill_by} applies.}
 
 \item{label_nudge}{A numeric value to nudge the labels (the distance between the label and the top of the bar).}
 
@@ -169,8 +177,26 @@ This is useful when split_by is used and the title needs to be dynamic.}
 
 \item{ylab}{A character string specifying the y-axis label.}
 
-\item{keep_empty}{A logical value indicating whether to keep empty groups.
-If FALSE, empty groups will be removed.}
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
+
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
 
 \item{expand}{The values to expand the x and y axes. It is like CSS padding.
 When a single value is provided, it is used for both axes on both sides.

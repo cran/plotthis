@@ -12,10 +12,11 @@ JitterPlot(
   in_form = c("long", "wide"),
   split_by = NULL,
   split_by_sep = "_",
+  keep_na = FALSE,
+  keep_empty = FALSE,
   sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc",
     "median"),
   flip = FALSE,
-  keep_empty = FALSE,
   group_by = NULL,
   group_by_sep = "_",
   group_name = NULL,
@@ -99,6 +100,27 @@ When \code{in_form} is "wide", \code{y} is not required. The values under \code{
 
 \item{split_by_sep}{The separator for multiple split_by columns. See \code{split_by}}
 
+\item{keep_na}{A logical value or a character to replace the NA values in the data.
+It can also take a named list to specify different behavior for different columns.
+If TRUE or NA, NA values will be replaced with NA.
+If FALSE, NA values will be removed from the data before plotting.
+If a character string is provided, NA values will be replaced with the provided string.
+If a named vector/list is provided, the names should be the column names to apply the behavior to,
+and the values should be one of TRUE, FALSE, or a character string.
+Without a named vector/list, the behavior applies to categorical/character columns used on the plot,
+for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.}
+
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
+
 \item{sort_x}{A character string to specify the sorting of x-axis, chosen from "none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median".
 \itemize{
 \item \code{none} means no sorting (as-is).
@@ -111,8 +133,6 @@ When \code{in_form} is "wide", \code{y} is not required. The values under \code{
 }}
 
 \item{flip}{A logical value to flip the plot.}
-
-\item{keep_empty}{A logical value to keep the empty levels in the x-axis.}
 
 \item{group_by}{A character string to dodge the points.}
 
@@ -275,15 +295,21 @@ Jittered point plot with optional background, highlight, labels and faceting.
 \examples{
 \donttest{
 set.seed(8525)
-n <- 200
-x <- sample(LETTERS[1:5], n, replace = TRUE)
-group <- sample(c("G1", "G2"), n, replace = TRUE)
+n <- 180
+x <- factor(
+    sample(c("A", NA, LETTERS[3:5]), n, replace = TRUE),
+    levels = c("A", "B", "C", "D", "E")
+)
+group <- factor(
+    sample(c("G1", NA, "G3"), n, replace = TRUE),
+    levels = c("G1", "G2", "G3")
+)
 size <- rexp(n, rate = 1)
 id <- paste0("pt", seq_len(n))
-y <- rnorm(n, mean = ifelse(group == "G1", 0.5, -0.5)) +
-     as.numeric(factor(x, levels = LETTERS[1:5]))/10
+y <- rnorm(n, mean = ifelse(is.na(group), 0, ifelse(group == "G1", 0.5, -0.5))) +
+     as.numeric(ifelse(is.na(x), 0, x))/10
 df <- data.frame(
-  x = factor(x, levels = LETTERS[1:5]),
+  x = x,
   y = y,
   group = group,
   size = size,
@@ -293,6 +319,9 @@ df <- data.frame(
 # Basic
 JitterPlot(df, x = "x", y = "y")
 
+# Keep empty x levels and NA
+JitterPlot(df, x = "x", y = "y", keep_na = TRUE, keep_empty = TRUE)
+
 # Map size with transform; legend shows original values
 JitterPlot(df, x = "x", y = "y", size_by = "size", size_name = "Abundance",
     size_trans = sqrt, order_by = "-y^2")
@@ -300,6 +329,11 @@ JitterPlot(df, x = "x", y = "y", size_by = "size", size_name = "Abundance",
 # Dodge by group and add a horizontal line
 JitterPlot(df, x = "x", y = "y", group_by = "group",
   add_hline = 0, hline_type = "dashed", hline_color = "red2")
+
+# Keep the empty levels only for color coding
+# Note the G3 is not blue (which is taken by unused level G2)
+JitterPlot(df, x = "x", y = "y", group_by = "group",
+    keep_na = TRUE, keep_empty = 'level')
 
 # Label top points by distance (y^2 + size^2)
 JitterPlot(df, x = "x", y = "y", size_by = "size", label_by = "id", nlabel = 3)

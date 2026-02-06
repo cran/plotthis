@@ -168,8 +168,16 @@ See \code{data} for more details.}
 
 \item{split_by_sep}{The separator for multiple split_by columns. See \code{split_by}}
 
-\item{keep_empty}{A logical value indicating whether to keep empty groups.
-If FALSE, empty groups will be removed.}
+\item{keep_empty}{One of FALSE, TRUE and "level". It can also take a named list to specify
+different behavior for different columns. Without a named list, the behavior applies to the
+categorical/character columns used on the plot, for example, the \code{x}, \code{group_by}, \code{fill_by}, etc.
+\itemize{
+\item{\code{FALSE} (default): Drop empty factor levels from the data before plotting.}
+\item{\code{TRUE}: Keep empty factor levels and show them as a separate category in the plot.}
+\item{\code{"level"}: Keep empty factor levels, but do not show them in the plot.
+But they will be assigned colors from the palette to maintain consistency across multiple plots.
+Alias: \code{levels}}
+}}
 
 \item{flow}{A logical value to use \link[ggalluvial:geom_flow]{ggalluvial::geom_flow} instead of \link[ggalluvial:geom_alluvium]{ggalluvial::geom_alluvium}.}
 

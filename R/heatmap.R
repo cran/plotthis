@@ -111,6 +111,10 @@ join_heatmap_meta <- function(data, meta_data, by, cr_split_by, split_by, which)
 #' @param columns_data A data frame containing additional data for columns, which can be used to add annotations to the heatmap.
 #' It will be joined to the main data by `columns_by` and `split_by` if `split_by` exists in `columns_data`.
 #' This is useful for adding additional information to the columns of the heatmap.
+#' @param keep_na Whether we should keep NA groups in rows, columns and split_by variables. Default is FALSE.
+#' FALSE to remove NA groups; TRUE to keep NA groups.
+#' A vector of column names can also be provided to specify which columns to keep NA groups.
+#' Note that the record will be removed if any of the grouping columns has NA and is not specified to keep NA.
 #' @return A list containing the processed data and metadata:
 #' * `data`: A list of data frames, one for each level of `split_by`. If no `split_by` is provided, the name will be `"..."`.
 #'    Each data frame is in the long format.
@@ -130,7 +134,7 @@ process_heatmap_data <- function(
     columns_by, columns_by_sep, columns_name,
     columns_split_by, columns_split_by_sep, columns_split_name,
     pie_group_by, pie_group_by_sep, pie_name,
-    rows_data, columns_data
+    rows_data, columns_data, keep_na, keep_empty
 ) {
     if (identical(rows_by, columns_by) && !is.null(rows_by)) {
         stop("[Heatmap] 'rows_by' and 'columns_by' can not be the same.")
@@ -154,6 +158,7 @@ process_heatmap_data <- function(
         stopifnot("[Heatmap] 'rows_by' is not supported when 'in_form = \"matrix\"'." = is.null(rows_by))
         stopifnot("[Heatmap] 'columns_by' is not supported when 'in_form = \"matrix\"'." = is.null(columns_by))
         stopifnot("[Heatmap] 'pie_group_by' is not supported when 'in_form = \"matrix\"'." = is.null(pie_group_by))
+        stopifnot("[Heatmap] 'keep_na' is not supported when 'in_form = \"matrix\"'." = isFALSE(keep_na))
 
         rows_name <- rows_name %||% "rows"
         data <- as.data.frame(data)
@@ -195,7 +200,6 @@ process_heatmap_data <- function(
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = rows_by_sep
         )
         stopifnot("[Heatmap] 'rows_by' must be specified when 'in_form = \"long\"'." = !is.null(rows_by))
-        data[[rows_by]] <- droplevels(data[[rows_by]])
 
         # columns_by/columns_split_by
         columns_by <- check_columns(
@@ -203,7 +207,6 @@ process_heatmap_data <- function(
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = columns_by_sep
         )
         stopifnot("[Heatmap] 'columns_by' must be specified when 'in_form = \"long\"'." = !is.null(columns_by))
-        data[[columns_by]] <- droplevels(data[[columns_by]])
 
         # join rows_data/columns_data
         if (!is.null(rows_data)) {
@@ -216,9 +219,6 @@ process_heatmap_data <- function(
             data, rows_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = rows_split_by_sep
         )
-        if (!is.null(rows_split_by)) {
-            data[[rows_split_by]] <- droplevels(data[[rows_split_by]])
-        }
 
         if (!is.null(columns_data)) {
             data <- join_heatmap_meta(
@@ -230,9 +230,6 @@ process_heatmap_data <- function(
             data, columns_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = columns_split_by_sep
         )
-        if (!is.null(columns_split_by)) {
-            data[[columns_split_by]] <- droplevels(data[[columns_split_by]])
-        }
 
         # rename
         if (!is.null(rows_name)) {
@@ -263,7 +260,6 @@ process_heatmap_data <- function(
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = columns_by_sep
         )
         stopifnot("[Heatmap] 'columns_by' must be specified when 'in_form = \"wide-rows\"'." = !is.null(columns_by))
-        data[[columns_by]] <- droplevels(data[[columns_by]])
 
         # rows_data/columns_data
         if (!is.null(rows_data)) {
@@ -276,9 +272,7 @@ process_heatmap_data <- function(
             data, rows_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = rows_split_by_sep
         )
-        if (!is.null(row_split_by)) {
-            data[[row_split_by]] <- droplevels(data[[row_split_by]])
-        }
+
         if (!is.null(columns_data)) {
             data <- join_heatmap_meta(
                 data, columns_data, by = columns_by, cr_split_by = columns_split_by,
@@ -289,9 +283,6 @@ process_heatmap_data <- function(
             data, columns_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = columns_split_by_sep
         )
-        if (!is.null(columns_split_by)) {
-            data[[columns_split_by]] <- droplevels(data[[columns_split_by]])
-        }
 
         if (!is.null(columns_name)) {
             data <- dplyr::rename(data, !!sym(columns_name) := columns_by)
@@ -329,9 +320,7 @@ process_heatmap_data <- function(
             data, rows_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = rows_split_by_sep
         )
-        if (!is.null(rows_split_by)) {
-            data[[rows_split_by]] <- droplevels(data[[rows_split_by]])
-        }
+
         if (!is.null(columns_data)) {
             data <- join_heatmap_meta(
                 data, columns_data, by = columns_by, cr_split_by = columns_split_by,
@@ -342,9 +331,6 @@ process_heatmap_data <- function(
             data, columns_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = columns_split_by_sep
         )
-        if (!is.null(columns_split_by)) {
-            data[[columns_split_by]] <- droplevels(data[[columns_split_by]])
-        }
 
         if (!is.null(rows_name)) {
             data <- dplyr::rename(data, !!sym(rows_name) := rows_by)
@@ -368,6 +354,11 @@ process_heatmap_data <- function(
         data <- dplyr::rename(data, !!sym(name) := !!sym(values_by))
         values_by <- name
     }
+    keep_na <- check_keep_na(keep_na, c(split_by, rows_by, rows_split_by, columns_by, columns_split_by))
+    if (!isFALSE(keep_empty)) {
+        warning("[Heatmap] 'keep_empty != FALSE' is not supported yet, and unused levels will be always dropped.")
+    }
+    data <- process_keep_na_empty(data, keep_na, list())
 
     list(
         data = if (is.null(split_by)) {
@@ -380,7 +371,9 @@ process_heatmap_data <- function(
         rows_split_by = rows_split_by,
         columns_by = columns_by,
         columns_split_by = columns_split_by,
-        pie_group_by = pie_group_by
+        pie_group_by = pie_group_by,
+        keep_na = keep_na,
+        keep_empty = keep_empty
     )
 }
 
@@ -690,10 +683,11 @@ anno_simple <- function(x, split_by = NULL, group_by = NULL, column = NULL, titl
         )
         anno <- ComplexHeatmap::anno_simple(x, col = col_fun, which = which, border = border, ...)
     } else {
-        colors <- palette_this(levels(x), palette = palette, palcolor = palcolor, alpha = alpha)
+        x_levels <- levels(x)
+        colors <- palette_this(x_levels, palette = palette, palcolor = palcolor, alpha = alpha, NA_keep = TRUE)
         lgd <- if (isTRUE(show_legend)) ComplexHeatmap::Legend(
             title = title,
-            labels = levels(x),
+            labels = x_levels,
             legend_gp = gpar(fill = colors),
             border = TRUE, nrow = if (legend.direction == "horizontal") 1 else NULL
         )
@@ -1044,7 +1038,7 @@ HeatmapAtomic <- function(
     # values
     lower_quantile = 0, upper_quantile = 0.99, lower_cutoff = NULL, upper_cutoff = NULL,
     # bg
-    add_bg = FALSE, bg_alpha = 0.5,
+    add_bg = FALSE, bg_alpha = 0.5, keep_na = FALSE, keep_empty = FALSE,
     # reticle
     add_reticle = FALSE, reticle_color = "grey",
     # passed to ComplexHeatmap::Heatmap
@@ -1277,8 +1271,9 @@ HeatmapAtomic <- function(
                 pie_values <- match.fun(pie_values)
             }
         }
-
+        keep_empty_pie_group <- if (isFALSE(keep_empty)) FALSE else keep_empty[[pie_group_by]]
         pie_group_levels <- levels(data[[pie_group_by]])
+        if (anyNA(data[[pie_group_by]])) pie_group_levels <- c(pie_group_by, NA)
         pie_data <- data %>%
             group_by(!!!syms(unique(c(rows_split_by, rows_by, columns_split_by, columns_by, pie_group_by))), .drop = FALSE) %>%
             summarise(.value = pie_values(!!sym(values_by)), .groups = "drop") %>%
@@ -1288,7 +1283,7 @@ HeatmapAtomic <- function(
             )
         names(pie_data) <- indices
 
-        pie_colors <- palette_this(pie_group_levels, palette = pie_palette, palcolor = pie_palcolor)
+        pie_colors <- palette_this(pie_group_levels, palette = pie_palette, palcolor = pie_palcolor, NA_keep = TRUE)
         if (is.character((pie_size))) {
             if (startsWith(pie_size, "nan")) {
                 fn <- match.fun(substring(pie_size, 4))
@@ -1618,6 +1613,7 @@ HeatmapAtomic <- function(
                 param[[worh]] <- unit(param[[worh]], "mm")
             }
 
+
             annos$show_annotation_name[[split_by]] <- TRUE
             anno_legend <- do.call(anno_simple, param)
             annos[[split_by]] <- anno_legend$anno
@@ -1919,6 +1915,10 @@ HeatmapAtomic <- function(
 #' @inheritParams process_heatmap_data
 #' @inheritParams HeatmapAtomic
 #' @inheritParams common_args
+#' @param keep_na Whether we should keep NA groups in rows, columns and split_by variables. Default is FALSE.
+#' FALSE to remove NA groups; TRUE to keep NA groups.
+#' A vector of column names can also be provided to specify which columns to keep NA groups.
+#' Note that the record will be removed if any of the grouping columns has NA and is not specified to keep NA.
 #' @export
 #' @importFrom patchwork wrap_plots
 #' @seealso \code{\link{anno_simple}}, \code{\link{anno_points}}, \code{\link{anno_lines}}, \code{\link{anno_pie}}, \code{\link{anno_violin}}, \code{\link{anno_boxplot}}, \code{\link{anno_density}}
@@ -2119,7 +2119,7 @@ Heatmap <- function(
     split_by = NULL, split_by_sep = "_",
     rows_by = NULL, rows_by_sep = "_", rows_split_by = NULL, rows_split_by_sep = "_",
     columns_by = NULL, columns_by_sep = "_", columns_split_by = NULL, columns_split_by_sep = "_",
-    rows_data = NULL, columns_data = NULL,
+    rows_data = NULL, columns_data = NULL, keep_na = FALSE, keep_empty = FALSE,
     # names
     columns_name = NULL, columns_split_name = NULL,
     rows_name = NULL, rows_split_name = NULL,
@@ -2179,7 +2179,7 @@ Heatmap <- function(
         columns_by = columns_by, columns_by_sep = columns_by_sep, columns_name = columns_name,
         columns_split_by = columns_split_by, columns_split_by_sep = columns_split_by_sep, columns_split_name = columns_split_name,
         pie_group_by = pie_group_by, pie_group_by_sep = pie_group_by_sep, pie_name = pie_name,
-        rows_data = rows_data, columns_data = columns_data
+        rows_data = rows_data, columns_data = columns_data, keep_na = keep_na, keep_empty = keep_empty
     )
 
     palette <- check_palette(palette, names(hmdata$data))
@@ -2235,7 +2235,7 @@ Heatmap <- function(
                 lower_quantile = lower_quantile, upper_quantile = upper_quantile,
                 lower_cutoff = lower_cutoff, upper_cutoff = upper_cutoff,
 
-                add_bg = add_bg, bg_alpha = bg_alpha,
+                add_bg = add_bg, bg_alpha = bg_alpha, keep_na = hmdata$keep_na, keep_empty = hmdata$keep_empty,
 
                 add_reticle = add_reticle, reticle_color = reticle_color,
 
