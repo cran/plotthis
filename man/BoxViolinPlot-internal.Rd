@@ -9,13 +9,12 @@ BoxViolinPlot(
   x,
   x_sep = "_",
   y = NULL,
-  base = c("box", "violin"),
+  base = c("box", "violin", "bar", "none"),
   in_form = c("long", "wide"),
   split_by = NULL,
   split_by_sep = "_",
   symnum_args = NULL,
-  sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc",
-    "median"),
+  sort_x = NULL,
   flip = FALSE,
   keep_empty = FALSE,
   keep_na = FALSE,
@@ -23,7 +22,7 @@ BoxViolinPlot(
   group_by_sep = "_",
   group_name = NULL,
   paired_by = NULL,
-  x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45),
+  x_text_angle = ifelse(isTRUE(flip), 0, 45),
   step_increase = 0.1,
   fill_mode = ifelse(!is.null(group_by), "dodge", "x"),
   fill_reverse = FALSE,
@@ -53,6 +52,10 @@ BoxViolinPlot(
   box_color = "black",
   box_width = 0.1,
   box_ptsize = 2.5,
+  add_errorbar = "SEM",
+  errorbar_color = "grey20",
+  errorbar_width = 0.4,
+  errorbar_linewidth = 0.6,
   add_trend = FALSE,
   trend_color = NULL,
   trend_linewidth = 1,
@@ -114,7 +117,8 @@ When \code{in_form} is "wide", \code{x} columns will not be concatenated.}
 
 \item{y}{A character string specifying the column name of the data frame to plot for the y-axis.}
 
-\item{base}{A character string to specify the base plot type. Either "box", "violin" or "none" (used by BeeswarmPlot).}
+\item{base}{A character string to specify the base plot type. Either "box", "violin", "bar" or "none" (used by BeeswarmPlot).
+When "bar", bars showing the mean values are plotted. This is mutually exclusive with \code{add_box}.}
 
 \item{in_form}{A character string to specify the input data type. Either "long" or "wide".}
 
@@ -133,16 +137,9 @@ In other words, we use the following convention for symbols indicating statistic
 \item \verb{****}: p <= 0.0001
 }}
 
-\item{sort_x}{A character string to specify the sorting of x-axis, chosen from "none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median".
-\itemize{
-\item \code{none} means no sorting (as-is).
-\item \code{mean_asc} sorts the x-axis by ascending mean of y-values.
-\item \code{mean_desc} sorts the x-axis by descending mean of y-values.
-\item \code{mean} is an alias for \code{mean_asc}.
-\item \code{median_asc} sorts the x-axis by ascending median of y-values.
-\item \code{median_desc} sorts the x-axis by descending median of y-values.
-\item \code{median} is an alias for \code{median_asc}.
-}}
+\item{sort_x}{An expression (in character string) to order x-axis.
+For example, "mean(y)" will order the x-axis by the mean of y. Default is NULL, which means keeping the original order of x.
+Note that when keep_empty is TRUE for x, the empty x levels will always be placed at the end of the x-axis.}
 
 \item{flip}{A logical value to flip the plot.}
 
@@ -253,6 +250,21 @@ Default is 0.9}
 \item{box_width}{A numeric value to specify the width of the box plot.}
 
 \item{box_ptsize}{A numeric value to specify the size of the box plot points in the middle.}
+
+\item{add_errorbar}{A character string to specify the type of error bars to add to bar plots.
+Only available when \code{base = "bar"}. Case insensitive. Available options are:
+\itemize{
+\item "SEM" (default): Standard error of the mean.
+\item "SD": Standard deviation.
+\item "CI" or "CIXX" (e.g., "CI95"): Confidence interval. "CI" defaults to "CI95" (95\\% CI).
+\item "none": No error bars.
+}}
+
+\item{errorbar_color}{A character string to specify the color of the error bars. Default is "black".}
+
+\item{errorbar_width}{A numeric value to specify the width of the error bar caps. Default is 0.5.}
+
+\item{errorbar_linewidth}{A numeric value to specify the line width of the error bars. Default is 0.75.}
 
 \item{add_trend}{A logical value to add trend line to the plot.}
 

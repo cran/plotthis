@@ -280,8 +280,17 @@ ManhattanPlotAtomic <- function(
         }
     }
 
-    attr(p, "height") <- 4.5
-    attr(p, "width") <- 0.4 * length(levels(mpdata$data[[chr_by]]))
+    n_chrom <- length(levels(mpdata$data[[chr_by]]))
+    dims <- calculate_plot_dimensions(
+        base_height = 4.5,
+        aspect.ratio = NULL,
+        n_x = n_chrom,
+        x_scale_factor = 0.4,
+        legend.position = "none"
+    )
+
+    attr(p, "height") <- dims$height
+    attr(p, "width") <- dims$width
 
     p
 }

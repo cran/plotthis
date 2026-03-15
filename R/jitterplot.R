@@ -208,10 +208,14 @@ JitterPlotAtomic <- function(
     }
 
     # Positioner (jitter + optional dodge)
-    pos <- position_jitterdodge(
-        jitter.width = jitter_width, jitter.height = jitter_height,
-        dodge.width = ifelse(is.null(group_by), 0, 0.9), seed = seed
-    )
+    if (is.null(group_by)) {
+        pos <- position_jitter(width = jitter_width, height = jitter_height, seed = seed)
+    } else {
+        pos <- position_jitterdodge(
+            jitter.width = jitter_width, jitter.height = jitter_height,
+            dodge.width = 0.9, seed = seed
+        )
+    }
 
     # Pre-calculate jittered positions for labels (geom_text_repel doesn't respect position adjustments)
     if (any(data$.show_label)) {
@@ -219,7 +223,8 @@ JitterPlotAtomic <- function(
         temp_data <- data
         temp_mapping <- aes(x = !!sym(x), y = !!sym(y))
         if (!is.null(group_by)) {
-            temp_mapping$group <- aes(group = !!sym(group_by))$group
+            # position_jitterdodge requires a visual aesthetic (fill/colour), not just group
+            temp_mapping$fill <- aes(fill = !!sym(group_by))$fill
         }
         temp_plot <- ggplot2::ggplot(temp_data, temp_mapping) +
             geom_point(position = pos) +
@@ -377,16 +382,6 @@ JitterPlotAtomic <- function(
         scale_y_continuous(trans = y_trans, n.breaks = y_nbreaks) +
         labs(title = title, subtitle = subtitle, x = xlab %||% x, y = ylab %||% y)
 
-    height <- width <- 0
-    if (!identical(legend.position, "none")) {
-        if (legend.position %in% c("right", "left")) {
-            width <- width + 1
-        } else if (legend.direction == "horizontal") {
-            height <- height + 1
-        } else {
-            height <- height + 2
-        }
-    }
     x_maxchars <- max(nchar(levels(data[[x]])))
     nx <- nlevels(data[[x]])
     nd <- ifelse(is.null(group_by), 1, nlevels(data[[group_by]]))
@@ -403,8 +398,6 @@ JitterPlotAtomic <- function(
             panel.grid.major.y = element_line(color = "grey", linetype = 2)
         )
         if (facet_free) p <- p + coord_flip() else p <- p + coord_flip(ylim = c(y_min_use, y_max_use))
-        width <- max(3, width + 2.2 + x_maxchars * 0.05)
-        height <- height + nx * nd * 0.3
     } else {
         strip_position <- "top"
         p <- p + ggplot2::theme(
@@ -412,8 +405,6 @@ JitterPlotAtomic <- function(
             panel.grid.major.x = element_line(color = "grey", linetype = 2)
         )
         if (!facet_free) p <- p + ggplot2::coord_cartesian(ylim = c(y_min_use, y_max_use))
-        height <- max(3, height + 2 + x_maxchars * 0.05)
-        width <- width + nx * nd * 0.3
     }
 
     p <- p +
@@ -424,6 +415,38 @@ JitterPlotAtomic <- function(
             legend.position = legend.position,
             legend.direction = legend.direction
         )
+
+    if (isTRUE(flip)) {
+        label_min_width <- max(3, 2.2 + x_maxchars * 0.05)
+        dims <- calculate_plot_dimensions(
+            base_height = label_min_width,
+            aspect.ratio = aspect.ratio,
+            n_y = nx * nd,
+            y_scale_factor = 0.5,
+            legend.position = legend.position,
+            legend.direction = legend.direction,
+            legend_n = nd,
+            legend_nchar = max(nchar(col_levels)),
+            flip = TRUE
+        )
+        height <- dims$height
+        width <- max(dims$width, label_min_width)
+    } else {
+        label_min_height <- 2 + x_maxchars * 0.05
+        dims <- calculate_plot_dimensions(
+            base_height = label_min_height,
+            aspect.ratio = aspect.ratio,
+            n_x = nx * nd,
+            x_scale_factor = 0.5,
+            legend.position = legend.position,
+            legend.direction = legend.direction,
+            legend_n = nd,
+            legend_nchar = max(nchar(col_levels)),
+            flip = FALSE
+        )
+        height <- max(dims$height, label_min_height)
+        width <- dims$width
+    }
 
     attr(p, "height") <- height
     attr(p, "width") <- max(width, height)

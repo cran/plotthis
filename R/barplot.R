@@ -33,7 +33,7 @@
 #' @importFrom rlang sym %||%
 #' @importFrom dplyr %>% group_by summarise n
 #' @importFrom tidyr complete
-#' @importFrom ggplot2 aes geom_bar scale_fill_manual labs scale_x_discrete scale_y_continuous guide_legend guide_colorbar
+#' @importFrom ggplot2 aes geom_bar geom_text scale_fill_manual labs scale_x_discrete scale_y_continuous guide_legend guide_colorbar
 #' @importFrom ggplot2 element_line waiver coord_flip scale_color_manual guide_legend coord_cartesian
 #' @importFrom ggrepel geom_text_repel
 BarPlotSingle <- function(
@@ -78,7 +78,7 @@ BarPlotSingle <- function(
         fill_is_numeric <- FALSE
         palette <- palette %||% "Paired"
     } else {
-        fill_by <- check_columns(data, fill_by)
+        fill_by <- check_columns(data, fill_by, allow_multi = TRUE)
         if (is.numeric(data[[fill_by]])) {
             fill_guide <- guide_colorbar(frame.colour = "black", ticks.colour = "black", title.hjust = 0)
             fill_is_numeric <- TRUE
@@ -138,12 +138,21 @@ BarPlotSingle <- function(
         label_data$.sign <- label_data[[y]] > 0
         label_data[[y]] <- label_data[[y]] + yr * label_nudge * ifelse(label_data$.sign, 1, -1)
 
-        p <- p + geom_text_repel(
-            data = label_data, mapping = aes(label = !!sym(".label")),
-            color = label_fg, size = label_size, hjust = if (flip) ifelse(label_data$.sign, 0, 1) else 0.5,
-            bg.color = label_bg, bg.r = label_bg_r, direction = "y", force = 0,
-            min.segment.length = 0, max.overlaps = 100, segment.color = 'transparent'
-        )
+        if (!isTRUE(flip)) {
+            p <- p + geom_text_repel(
+                data = label_data, mapping = aes(label = !!sym(".label")),
+                color = label_fg, size = label_size, hjust = if (flip) ifelse(label_data$.sign, 0, 1) else 0.5,
+                bg.color = label_bg, bg.r = label_bg_r, direction = "y", force = 0,
+                min.segment.length = 0, max.overlaps = 100, segment.color = 'transparent'
+            )
+        } else {
+            p <- p + geom_text(
+                data = label_data, mapping = aes(label = !!sym(".label")),
+                color = label_fg, size = label_size,
+                hjust = if (flip) ifelse(label_data$.sign, 0, 1) else 0.5,
+                show.legend = FALSE
+            )
+        }
     }
     p <- p +
         labs(title = title, subtitle = subtitle, x = xlab %||% x, y = ylab %||% y) +
@@ -209,25 +218,22 @@ BarPlotSingle <- function(
         p <- p + coord_cartesian(ylim = c(y_min, y_max))
     }
 
-    height <- 3.5 + max(nchar(unlist(strsplit(levels(data[[x]]), "\n"))) * 0.1, 1)
-    width <- .5 + min(nlevels(data[[x]]) * .8, height / aspect.ratio)
-    if (!identical(legend.position, "none")) {
-        if (legend.position %in% c("right", "left")) {
-            width <- width + 1
-        } else if (legend.direction == "horizontal") {
-            height <- height + 1
-        } else {
-            width <- width + 2
-        }
-    }
+    x_maxchars <- max(nchar(unlist(strsplit(levels(data[[x]]), "\n"))))
+    dims <- calculate_plot_dimensions(
+        base_height = if (isTRUE(flip)) max(.5 + nlevels(data[[x]]) * .8, 4) else 3.5 + max(x_maxchars * 0.1, 1),
+        aspect.ratio = aspect.ratio,
+        n_x = if (isTRUE(flip)) NULL else nlevels(data[[x]]),
+        x_scale_factor = 0.8,
+        legend.position = legend.position,
+        legend.direction = legend.direction,
+        legend_n = if (!fill_is_numeric) length(fill_vals) else 1,
+        legend_nchar = if (!fill_is_numeric) max(nchar(as.character(fill_vals)), na.rm = TRUE) else 5,
+        flip = isTRUE(flip)
+    )
 
-    if (isTRUE(flip)) {
-        attr(p, "height") <- width
-        attr(p, "width") <- height
-    } else {
-        attr(p, "height") <- height
-        attr(p, "width") <- width
-    }
+    attr(p, "height") <- dims$height
+    attr(p, "width") <- dims$width + if (isTRUE(flip)) x_maxchars * 0.1 else 0
+
     p
 }
 
@@ -300,7 +306,7 @@ BarPlotGrouped <- function(
             mutate(!!sym(y_scaled) := !!sym(y) / sum(!!sym(y))) %>%
             ungroup()
 
-        for (col in unique(c, facet_by)) {
+        for (col in unique(c(x, facet_by))) {
             data[[col]] <- factor(data[[col]], levels = levels(orig_data[[col]]))
         }
     }
@@ -457,29 +463,21 @@ BarPlotGrouped <- function(
         p <- p + coord_cartesian(ylim = c(y_min, y_max))
     }
 
-    height <- 4.5
-    if (is.character(position) && position == "stack") {
-        width <- max(min(.5 + nlevels(data[[x]]) * .8, 1.2 * height / aspect.ratio), 4.5)
-    } else {
-        width <- .5 + min(nlevels(data[[x]]) * length(unique(data[[group_by]])) * .5, 1.2 * height / aspect.ratio)
-    }
-    if (!identical(legend.position, "none")) {
-        if (legend.position %in% c("right", "left")) {
-            width <- width + 1
-        } else if (legend.direction == "horizontal") {
-            height <- height + 1
-        } else {
-            width <- width + 2
-        }
-    }
+    n_groups <- length(unique(data[[group_by]]))
+    dims <- calculate_plot_dimensions(
+        base_height = 4.5,
+        aspect.ratio = aspect.ratio,
+        n_x = if (is.character(position) && position == "stack") nlevels(data[[x]]) else nlevels(data[[x]]) * n_groups,
+        x_scale_factor = if (is.character(position) && position == "stack") 0.8 else 0.5,
+        legend.position = legend.position,
+        legend.direction = legend.direction,
+        legend_n = n_groups,
+        legend_nchar = max(nchar(levels(data[[group_by]]))),
+        flip = isTRUE(flip)
+    )
 
-    if (isTRUE(flip)) {
-        attr(p, "height") <- width
-        attr(p, "width") <- height
-    } else {
-        attr(p, "height") <- height
-        attr(p, "width") <- width
-    }
+    attr(p, "height") <- dims$height
+    attr(p, "width") <- dims$width
 
     p
 }
@@ -526,7 +524,7 @@ BarPlotAtomic <- function(
             add_trend = add_trend, trend_color = trend_color, trend_linewidth = trend_linewidth, trend_ptsize = trend_ptsize,
             legend.position = legend.position, legend.direction = legend.direction, y_min = y_min, y_max = y_max,
             title = title, subtitle = subtitle, xlab = xlab, ylab = ylab, keep_na = keep_na, keep_empty = keep_empty,
-            expand = expand, fill_by = ifelse(isTRUE(fill_by), x, fill_by), fill_name = fill_name, width = width, ...
+            expand = expand, fill_by = fill_by, fill_name = fill_name, width = width, ...
         )
     } else {
         stopifnot("[BarPlot] `fill_by` cannot be applied when `group_by` is specified." = !missing(fill_by) || identical(fill_by, group_by))
@@ -794,7 +792,7 @@ SplitBarPlotAtomic <- function(
     }
     x <- check_columns(data, x)
     y <- check_columns(data, y, force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = y_sep)
-    fill_by <- check_columns(data, fill_by)
+    fill_by <- check_columns(data, fill_by, allow_multi = TRUE)
     fill_by <- fill_by %||% direction_name
     data[[direction_name]] <- ifelse(data[[x]] > 0, direction_pos_name, direction_neg_name)
     data[[direction_name]] <- factor(data[[direction_name]], levels = c(direction_pos_name, direction_neg_name))
@@ -1015,27 +1013,25 @@ SplitBarPlotAtomic <- function(
             legend.direction = legend.direction
         )
 
+    dims <- calculate_plot_dimensions(
+        base_height = 5.5,
+        aspect.ratio = aspect.ratio,
+        n_y = nlevels(data[[y]]),
+        y_scale_factor = bar_height / 4,
+        legend.position = legend.position,
+        legend.direction = legend.direction,
+        legend_n = if (!fill_by_numeric) length(fill_vals) else 1,
+        legend_nchar = if (!fill_by_numeric) max(nchar(as.character(fill_vals)), na.rm = TRUE) else 5,
+        flip = isTRUE(flip)
+    )
+
     if (isTRUE(flip)) {
         p <- p + coord_flip(xlim = c(x_min, x_max))
-        height <- 5.5
-        width <- max(nlevels(data[[y]]) * bar_height / 4, 4.5)
     } else {
         p <- p + coord_cartesian(xlim = c(x_min, x_max))
-        width <- 5.5
-        height <- max(nlevels(data[[y]]) * bar_height / 4, 4.5)
     }
-    if (!identical(legend.position, "none")) {
-        if (legend.position %in% c("right", "left")) {
-            width <- width + 1
-        } else if (legend.direction == "horizontal") {
-            height <- height + 1
-        } else {
-            width <- width + 2
-        }
-    }
-
-    attr(p, "height") <- height
-    attr(p, "width") <- width
+    attr(p, "height") <- dims$height
+    attr(p, "width") <- dims$width
 
     facet_plot(p, facet_by, facet_scales, facet_nrow, facet_ncol, facet_byrow,
         legend.position = legend.position, legend.direction = legend.direction,

@@ -1,7 +1,7 @@
 Package: plotthis
 Title: High-Level Plotting Built Upon 'ggplot2' and Other Plotting
         Packages
-Version: 0.10.0
+Version: 0.11.1
 Authors@R: 
     person("Panwen", "Wang", , "pwwang@pwwang.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4614-8970"))
@@ -21,17 +21,18 @@ Depends: R (>= 4.2.0)
 Imports: circlize, ggplot2, rlang, dplyr, tidyr, glue, forcats, gtable,
         reshape2, stringr, scales, gridtext, methods, patchwork,
         ggrepel, ggnewscale, cowplot, zoo
-Suggests: testthat, Matrix, alluvial, datasets, ComplexHeatmap,
+Suggests: plotly, testthat, Matrix, alluvial, datasets, ComplexHeatmap,
         cluster, clustree, gglogger, ggwordcloud, ggalluvial,
         ggVennDiagram (>= 1.5.0), ggupset, ggpubr, ggbeeswarm, ggforce,
         ggraph, ggridges, ggmanh, qqplotr, hexbin, igraph, iNEXT,
         scattermore, sf, terra, concaveman, plotROC, OptimalCutpoints,
         proxyC, metR
 LazyData: true
+Additional_repositories: https://bioconductor.org/packages/release/bioc
 Config/Needs/website: rmarkdown
 NeedsCompilation: no
-Packaged: 2026-02-06 21:55:32 UTC; pwwang
+Packaged: 2026-03-15 05:35:35 UTC; pwwang
 Author: Panwen Wang [aut, cre] (ORCID: <https://orcid.org/0000-0002-4614-8970>)
 Maintainer: Panwen Wang <pwwang@pwwang.com>
 Repository: CRAN
-Date/Publication: 2026-02-06 22:20:03 UTC
+Date/Publication: 2026-03-15 06:00:02 UTC

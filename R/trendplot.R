@@ -48,7 +48,7 @@ TrendPlotAtomic <- function(
             dplyr::group_by(!!!syms(unique(c(x, group_by, facet_by)))) %>%
             summarise(.count = n(), .groups = "drop")
 
-        for (col in c(x, group_by, facet_by)) {
+        for (col in unique(c(x, group_by, facet_by))) {
             data[[col]] <- factor(data[[col]], levels = levels(orig_data[[col]]))
         }
     }
@@ -59,7 +59,7 @@ TrendPlotAtomic <- function(
             mutate(!!sym(y) := !!sym(y) / sum(!!sym(y))) %>%
             ungroup()
 
-        for (col in c(x, facet_by)) {
+        for (col in unique(c(x, facet_by))) {
             data[[col]] <- factor(data[[col]], levels = levels(orig_data[[col]]))
         }
     }
@@ -88,8 +88,22 @@ TrendPlotAtomic <- function(
         #     ungroup()
         legend.position <- ifelse(inherits(legend.position, "waiver"), "right", legend.position)
     }
-    nr <- nrow(data)
-    dat_area <- data[rep(seq_len(nr), each = 2), , drop = FALSE]
+    # Complete all x * group_by (and facet_by) combinations for the area layer
+    # so that geom_area doesn't interpolate across missing groups, which would
+    # cause stacked areas to exceed the correct total.
+    complete_vars <- unique(c(x, group_by, facet_by))
+    complete_fill <- setNames(list(0), y)
+    data_for_area <- data %>%
+        tidyr::complete(!!!syms(complete_vars), fill = complete_fill)
+    # Restore factor levels that complete() may have altered
+    for (col in complete_vars) {
+        if (is.factor(data[[col]])) {
+            data_for_area[[col]] <- factor(data_for_area[[col]], levels = levels(data[[col]]))
+        }
+    }
+
+    nr <- nrow(data_for_area)
+    dat_area <- data_for_area[rep(seq_len(nr), each = 2), , drop = FALSE]
     # Convert factor to numeric, handling NA values
     x_numeric <- as.numeric(dat_area[[x]])
     # For NA values in factors, assign them the position after all levels
@@ -150,18 +164,19 @@ TrendPlotAtomic <- function(
 
     xs <- levels(data[[x]])
     if (anyNA(data[[x]])) xs <- c(xs, NA)
-    height = ifelse(length(xs) < 10, 4.5, 6.5)
-    width = 0.5 + length(xs) * ifelse(length(xs) < 10, 0.8, 0.25)
-    if (legend.position %in% c("right", "left")) {
-        width <- width + 1
-    } else if (legend.direction == "horizontal") {
-        height <- height + 1
-    } else {
-        width <- width + 2
-    }
+    dims <- calculate_plot_dimensions(
+        base_height = ifelse(length(xs) < 10, 4.5, 6.5),
+        aspect.ratio = aspect.ratio,
+        n_x = length(xs),
+        x_scale_factor = ifelse(length(xs) < 10, 0.8, 0.25),
+        legend.position = legend.position,
+        legend.direction = legend.direction,
+        legend_n = length(group_vals),
+        legend_nchar = max(nchar(as.character(group_vals)), na.rm = TRUE)
+    )
 
-    attr(p, "height") <- height
-    attr(p, "width") <- width
+    attr(p, "height") <- dims$height
+    attr(p, "width") <- dims$width
 
     facet_plot(p, facet_by, facet_scales, facet_nrow, facet_ncol, facet_byrow,
         legend.position = legend.position, legend.direction = legend.direction,

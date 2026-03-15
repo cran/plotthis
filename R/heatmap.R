@@ -101,6 +101,13 @@ join_heatmap_meta <- function(data, meta_data, by, cr_split_by, split_by, which)
 #' @param columns_split_by A character of column name in `data` that contains the split information for columns.
 #' @param columns_split_by_sep A character string to concat multiple columns in `columns_split_by`.
 #' @param columns_split_name A character string to rename the column created by `columns_split_by`, which will be reflected in the name of the annotation or legend.
+#' @param rows_orderby A expression (in character) to specify how to order rows. It will be evaluated in the context of the data frame used for rows (after grouping by rows_split_by and rows_by). The expression should return a vector of the same length as the number of rows in the data frame. The default is NULL, which means no specific ordering.
+#' Can't be used with cluster_rows = TRUE.
+#' This is applied before renaming rows_by to rows_name.
+#' @param columns_orderby A expression (in character) to specify how to order columns. It will be evaluated in the context of the data frame used for columns (after grouping by columns
+#' split_by and columns_by). The expression should return a vector of the same length as the number of rows in the data frame. The default is NULL, which means no specific ordering.
+#' Can't be used with cluster_columns = TRUE.
+#' This is applied before renaming columns_by to columns_name.
 #' @param pie_group_by A character of column name in `data` that contains the group information for pie charts.
 #' This is used to create pie charts in the heatmap when `cell_type` is `"pie"`.
 #' @param pie_group_by_sep A character string to concat multiple columns in `pie_group_by`.
@@ -124,11 +131,12 @@ join_heatmap_meta <- function(data, meta_data, by, cr_split_by, split_by, which)
 #' * `columns_by`: The name of the column containing the column information.
 #' * `columns_split_by`: The name of the column containing the column split information.
 #' * `pie_group_by`: The name of the column containing the pie group information.
-#' @importFrom rlang sym %||%
+#' @importFrom rlang sym syms %||% parse_expr
+#' @importFrom dplyr arrange group_by summarise pull
 #' @keywords internal
 process_heatmap_data <- function(
     data, in_form, values_by, name,
-    split_by, split_by_sep,
+    split_by, split_by_sep, rows_orderby, columns_orderby,
     rows_by, rows_by_sep, rows_name,
     rows_split_by, rows_split_by_sep, rows_split_name,
     columns_by, columns_by_sep, columns_name,
@@ -189,6 +197,31 @@ process_heatmap_data <- function(
         force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = split_by_sep
     )
 
+    apply_orderby <- function(df, orderby, by, sby, sby_levels) {
+        if (!is.null(orderby)) {
+            by_levels <- df %>%
+                group_by(!!sym(by)) %>%
+                summarise(.orderby = !!parse_expr(orderby)) %>%
+                arrange(!!sym(".orderby")) %>%
+                pull(!!sym(by)) %>%
+                as.character() %>%
+                unique()
+            df[[by]] <- factor(df[[by]], levels = by_levels)
+
+            if (!is.null(sby) && is.null(sby_levels)) {
+                sby_levels <- df %>%
+                    group_by(!!sym(sby)) %>%
+                    summarise(.orderby = !!parse_expr(orderby)) %>%
+                    arrange(!!sym(".orderby")) %>%
+                    pull(!!sym(sby)) %>%
+                    as.character() %>%
+                    unique()
+                df[[sby]] <- factor(df[[sby]], levels = sby_levels)
+            }
+        }
+        df
+    }
+
     if (in_form == "long") {
         # values_by
         values_by <- check_columns(data, values_by)
@@ -215,6 +248,11 @@ process_heatmap_data <- function(
                 split_by = split_by, which = "row"
             )
         }
+        rows_split_levels <- if (length(rows_split_by) == 1 && is.factor(data[[rows_split_by]])) {
+            levels(data[[rows_split_by]])
+        } else {
+            NULL
+        }
         rows_split_by <- check_columns(
             data, rows_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = rows_split_by_sep
@@ -226,17 +264,31 @@ process_heatmap_data <- function(
                 split_by = split_by, which = "column"
             )
         }
+        columns_split_leves <- if (length(columns_split_by) == 1 && is.factor(data[[columns_split_by]])) {
+            levels(data[[columns_split_by]])
+        } else {
+            NULL
+        }
         columns_split_by <- check_columns(
             data, columns_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = columns_split_by_sep
         )
 
+        data <- apply_orderby(data, rows_orderby, rows_by, rows_split_by, rows_split_levels)
+        data <- apply_orderby(data, columns_orderby, columns_by, columns_split_by, columns_split_leves)
+
         # rename
         if (!is.null(rows_name)) {
+            if (identical(rows_name, "")) {
+                rows_name <- " "
+            }
             data <- dplyr::rename(data, !!sym(rows_name) := rows_by)
             rows_by <- rows_name
         }
         if (!is.null(columns_name)) {
+            if (identical(columns_name, "")) {
+                columns_name <- " "
+            }
             data <- dplyr::rename(data, !!sym(columns_name) := columns_by)
             columns_by <- columns_name
         }
@@ -268,7 +320,12 @@ process_heatmap_data <- function(
                 split_by = split_by, which = "row"
             )
         }
-        row_split_by <- check_columns(
+        rows_split_levels <- if (length(rows_split_by) == 1 && is.factor(data[[rows_split_by]])) {
+            levels(data[[rows_split_by]])
+        } else {
+            NULL
+        }
+        rows_split_by <- check_columns(
             data, rows_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = rows_split_by_sep
         )
@@ -279,12 +336,23 @@ process_heatmap_data <- function(
                 split_by = split_by, which = "column"
             )
         }
+        columns_split_levels <- if (length(columns_split_by) == 1 && is.factor(data[[columns_split_by]])) {
+            levels(data[[columns_split_by]])
+        } else {
+            NULL
+        }
         columns_split_by <- check_columns(
             data, columns_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = columns_split_by_sep
         )
 
+        data <- apply_orderby(data, rows_orderby, rows_by, rows_split_by, rows_split_levels)
+        data <- apply_orderby(data, columns_orderby, columns_by, columns_split_by, columns_split_levels)
+
         if (!is.null(columns_name)) {
+            if (identical(columns_name, "")) {
+                columns_name <- " "
+            }
             data <- dplyr::rename(data, !!sym(columns_name) := columns_by)
             columns_by <- columns_name
         }
@@ -316,6 +384,11 @@ process_heatmap_data <- function(
                 split_by = split_by, which = "row"
             )
         }
+        rows_split_levels <- if (length(rows_split_by) == 1 && is.factor(data[[rows_split_by]])) {
+            levels(data[[rows_split_by]])
+        } else {
+            NULL
+        }
         rows_split_by <- check_columns(
             data, rows_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = rows_split_by_sep
@@ -327,30 +400,53 @@ process_heatmap_data <- function(
                 split_by = split_by, which = "column"
             )
         }
+        columns_split_leves <- if (length(columns_split_by) == 1 && is.factor(data[[columns_split_by]])) {
+            levels(data[[columns_split_by]])
+        } else {
+            NULL
+        }
         columns_split_by <- check_columns(
             data, columns_split_by,
             force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = columns_split_by_sep
         )
 
+        data <- apply_orderby(data, rows_orderby, rows_by, rows_split_by, rows_split_levels)
+        data <- apply_orderby(data, columns_orderby, columns_by, columns_split_by, columns_split_leves)
+
         if (!is.null(rows_name)) {
+            if (identical(rows_name, "")) {
+                rows_name <- " "
+            }
             data <- dplyr::rename(data, !!sym(rows_name) := rows_by)
             rows_by <- rows_name
         }
     }
 
     if (!is.null(rows_split_name) && !is.null(rows_split_by)) {
+        if (identical(rows_split_name, "")) {
+            rows_split_name <- " "
+        }
         data <- dplyr::rename(data, !!sym(rows_split_name) := rows_split_by)
         rows_split_by <- rows_split_name
     }
     if (!is.null(columns_split_name) && !is.null(columns_split_by)) {
+        if (identical(columns_split_name, "")) {
+            columns_split_name <- " "
+        }
         data <- dplyr::rename(data, !!sym(columns_split_name) := columns_split_by)
         columns_split_by <- columns_split_name
     }
     if (!is.null(pie_name) && !is.null(pie_group_by)) {
+        if (identical(pie_name, "")) {
+            pie_name <- " "
+        }
         data <- dplyr::rename(data, !!sym(pie_name) := pie_group_by)
         pie_group_by <- pie_name
     }
     if (!is.null(name)) {
+        if (identical(name, "")) {
+            name <- " "
+        }
         data <- dplyr::rename(data, !!sym(name) := !!sym(values_by))
         values_by <- name
     }
@@ -998,6 +1094,15 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #' @param alpha A numeric value between 0 and 1 specifying the transparency of the heatmap cells.
 #' @param return_grob A logical value indicating whether to return the grob object of the heatmap.
 #'  This is useful when merging multiple heatmaps using patchwork.
+#' @param padding A numeric vector of length 4 specifying the padding of the heatmap in the order of top, right, bottom, left.
+#' Like padding in css. Note that it is different than the `padding` argument in `ComplexHeatmap::draw()`, which is the padding
+#' in the order of bottom, left, top, right.
+#' It also support 1, 2, 3 values like css padding.
+#' When 1 element is provided, it will be used for all sides.
+#' When 2 elements are provided, the first one will be used for top and bottom, and the second one will be used for left and right.
+#' When 3 elements are provided, the first one will be used for top, the second one will be used for left and right, and the third one will be used for bottom.
+#' When 4 elements are provided, they will be used for top, right, bottom, and left respectively.
+#' If no unit is provided, the default unit will be "mm".
 #' @param ... Other arguments passed to [ComplexHeatmap::Heatmap()]
 #' When `row_names_max_width` is passed, a unit is expected. But you can also pass a numeric values,
 #' with a default unit "inches", or a string like "5inches" to specify the number and unit directly.
@@ -1052,7 +1157,7 @@ HeatmapAtomic <- function(
     row_annotation = NULL, row_annotation_side = "left", row_annotation_palette = "Paired", row_annotation_palcolor = NULL,
     row_annotation_type = "auto", row_annotation_params = list(), row_annotation_agg = NULL,
     # misc
-    flip = FALSE, alpha = 1, seed = 8525, return_grob = FALSE,
+    flip = FALSE, alpha = 1, seed = 8525, return_grob = FALSE, padding = 15,
     # cell customization
     layer_fun_callback = NULL, cell_type = "tile", cell_agg = NULL,
     ...
@@ -1064,6 +1169,7 @@ HeatmapAtomic <- function(
     if (isFALSE(row_title)) row_title <- NULL
     if (isTRUE(column_title)) column_title <- character(0)
     if (isTRUE(row_title)) row_title <- character(0)
+    stopifnot("[Heatmap] 'padding' should be a numeric vector of length 1, 2, 3, or 4." = length(padding) %in% 1:4)
 
     get_col_fun <- function(lower, upper, a = alpha) {
         # If the lower and upper cutoff are the same, we need to adjust the upper cutoff
@@ -1828,32 +1934,161 @@ HeatmapAtomic <- function(
     }
     rm(left_annos)
 
-    ## Set up the heatmap
-    rownames_width <- convertUnit(hmargs$row_names_max_width, "inches", valueOnly = TRUE) * 0.5 - 0.2
-    rownames_width <- max(rownames_width, 0)
-    if (isTRUE(flip)) {
-        width <- nrows * 0.25 + ncol_annos * 0.5 + rownames_width
-        # How about column name length (nchars)?
-        height <- ncols * 0.25 + nrow_annos * 0.5
+    ## Set up the heatmap dimensions
+    # Row names appear on left/right and add to width; only count when show_row_names is TRUE.
+    # hmargs$show_row_names already accounts for flip (equals original show_column_names when
+    # flip=TRUE, since original column labels become the row labels in the transposed matrix).
+    # hmargs$row_names_max_width likewise accounts for flip (uses columns_by labels when flip=TRUE).
+    rownames_width <- if (isTRUE(hmargs$show_row_names)) {
+        max(convertUnit(hmargs$row_names_max_width, "inches", valueOnly = TRUE) * 0.5 - 0.2, 0)
     } else {
-        width <- ncols * 0.25 + nrow_annos * 0.5 + rownames_width
-        height <- nrows * 0.25 + ncol_annos * 0.5
+        0
     }
+
+    # Estimate the dimension contribution of the original column labels.
+    # Column labels are rendered rotated (vertical text), so their display height is proportional
+    # to their text width. When flip=TRUE the matrix is transposed, so original column labels
+    # end up as hmargs row labels (left/right) — but colnames_height lives inside col_overhead
+    # which is routed to WIDTH in the flip case, so the geometry is still correct.
+    # Always gate on the original show_column_names param (not hmargs$show_column_names, which
+    # is swapped to show_row_names when flip=TRUE) to match the col_overhead accounting.
+    # Use rownames(hmargs$matrix) when flip=TRUE because t() moved the original column labels
+    # to row positions; use colnames(hmargs$matrix) otherwise.
+    colnames_height <- if (isTRUE(show_column_names)) {
+        orig_col_labels <- if (isTRUE(flip)) rownames(hmargs$matrix) else colnames(hmargs$matrix)
+        col_max_width <- ComplexHeatmap::max_text_width(orig_col_labels)
+        convertUnit(col_max_width, "inches", valueOnly = TRUE) * 0.25
+    } else {
+        0
+    }
+
+    # Annotation overhead per side:
+    #   - row-side  (left/right): dendrogram + per-track bars → adds to width
+    #   - col-side  (top/bottom): dendrogram + per-track bars → adds to height
+    # nrow_annos / ncol_annos include: (cluster_* + show_*_names)*4 + n_splits + n_name_annos
+    # We strip out the show_*_names contribution (already captured by rownames_width /
+    # colnames_height above) and reduce the per-item coefficient to avoid double-counting.
+    row_overhead <- (if (isTRUE(cluster_rows))    0.5 else 0) +
+                    (nrow_annos - show_row_names * 4) * 0.15
+    col_overhead <- (if (isTRUE(cluster_columns)) 0.5 else 0) +
+                    (ncol_annos - show_column_names * 4) * 0.15 + colnames_height
+
+    if (getOption("plotthis.dimcalc.enabled", TRUE)) {
+        # Cap the cell body to prevent runaway sizes for large heatmaps
+        max_body <- 8
+        if (isTRUE(flip)) {
+            body_width  <- min(nrows * 0.25, max_body)
+            body_height <- min(ncols * 0.25, max_body)
+        } else {
+            body_width  <- min(ncols * 0.25, max_body)
+            body_height <- min(nrows * 0.25, max_body)
+        }
+    } else {
+        if (isTRUE(flip)) {
+            body_width  <- nrows * 0.25
+            body_height <- ncols * 0.25
+        } else {
+            body_width  <- ncols * 0.25
+            body_height <- nrows * 0.25
+        }
+    }
+
+    padding <- if (inherits(padding, "unit")) padding else unit(padding, "mm")
+    if (length(padding) == 1) {
+        padding <- rep(padding, 4)
+    } else if (length(padding) == 2) {
+        # padding[1] -> top/bottom, padding[2] -> left/right
+        padding <- rep(padding, 2)
+    } else if (length(padding) == 3) {
+        # padding[1] -> top, padding[2] -> left/right, padding[3] -> bottom
+        padding <- c(padding, padding[2])
+    }
+    if (isTRUE(flip)) {
+        width  <- body_width  + col_overhead + rownames_width + convertUnit(sum(padding[c(1, 3)]), "inches", valueOnly = TRUE)
+        height <- body_height + row_overhead + convertUnit(sum(padding[c(2, 4)]), "inches", valueOnly = TRUE)
+    } else {
+        width  <- body_width  + row_overhead + rownames_width + convertUnit(sum(padding[c(2, 4)]), "inches", valueOnly = TRUE)
+        height <- body_height + col_overhead + convertUnit(sum(padding[c(1, 3)]), "inches", valueOnly = TRUE)
+    }
+    # make padding from top, right, bottom, left to match the order in ComplexHeatmap::draw()
+    # which is bottom, left, top and right.
+    padding <- padding[c(3, 4, 1, 2)]
+
+
     if (cell_type == "pie") {
-        width <- max(width, height)
-        height <- max(width, height)
+        sq <- max(width, height)
+        width  <- sq
+        height <- sq
     }
+
+    # ── Precise legend size contribution (mirrors calculate_plot_dimensions) ──
+    # Collect all candidate legend label strings to estimate max label width.
+    # Sources:
+    #   (a) main heatmap legend  – discrete item names, or formatted cutoff values
+    #   (b) name annotations – row/column labels shown as legends when show_*_names=FALSE,
+    #       and split annotations (rows_split_by / columns_split_by) which always show legends
+    #   (c) extra row / column annotation legends
+    .legend_label_cands <- character(0)
+    if (isTRUE(legend_discrete) && !is.null(legend_items)) {
+        .legend_label_cands <- c(.legend_label_cands, names(legend_items))
+    } else {
+        .legend_label_cands <- c(.legend_label_cands,
+            formatC(c(lower_cutoff, upper_cutoff), digits = 3, format = "g"))
+    }
+    # Helper: extract label strings from a column of `data`
+    .col_labels <- function(col) {
+        if (is.null(col) || !col %in% colnames(data)) return(character(0))
+        as.character(if (is.factor(data[[col]])) levels(data[[col]]) else unique(data[[col]]))
+    }
+    # Name-annotation legends:
+    #   – rows_by shows a legend when show_row_names=FALSE (and row_name_annotation=TRUE)
+    #   – columns_by shows a legend when show_column_names=FALSE (and column_name_annotation=TRUE)
+    #   – split_by annotations always show legends when present
+    if (!isTRUE(show_row_names) && isTRUE(row_name_annotation))
+        .legend_label_cands <- c(.legend_label_cands, .col_labels(rows_by))
+    if (!isTRUE(show_column_names) && isTRUE(column_name_annotation))
+        .legend_label_cands <- c(.legend_label_cands, .col_labels(columns_by))
+    .legend_label_cands <- c(.legend_label_cands,
+        .col_labels(rows_split_by),
+        .col_labels(columns_split_by))
+    # Extra row / column annotation legends
+    .scan_anno_labels <- function(anno) {
+        if (is.null(anno)) return(character(0))
+        cols <- if (is.list(anno)) unlist(anno) else as.character(anno)
+        unlist(lapply(cols[cols %in% colnames(data)], .col_labels))
+    }
+    .legend_label_cands <- c(.legend_label_cands,
+        .scan_anno_labels(row_annotation),
+        .scan_anno_labels(column_annotation))
+    legend_nchar <- if (length(.legend_label_cands) > 0) {
+        max(nchar(.legend_label_cands), na.rm = TRUE)
+    } else { 5L }
+    # Number of distinct legend blocks rendered by ComplexHeatmap
+    legend_n <- length(Filter(Negate(is.null), legends))
+
+    # Use the same per-character metrics as calculate_plot_dimensions()
+    legend_key_w  <- 0.30   # key swatch width + internal margin
+    legend_char_w <- 0.07   # inches per character of label text
+    legend_row_h  <- 0.30   # height of one stacked legend block
+    legend_pad    <- 0.35   # outer margin + optional title
+
     if (!identical(legend.position, "none")) {
         if (legend.position %in% c("right", "left")) {
-            if (legend.direction == "horizontal") {
-                width <- width + 3
-            } else {
-                width <- width + 1.5
-            }
+            # Vertical panel on the side; width driven by label length.
+            # When direction=="horizontal" the colorbar is rendered horizontally
+            # (wider), so add an extra 0.5 in to account for the larger key.
+            legend_extra <- if (legend.direction == "horizontal") 0.5 else 0
+            legend_width <- max(1.0, legend_key_w + legend_nchar * legend_char_w) + legend_extra
+            width <- width + legend_width
         } else if (legend.direction == "horizontal") {
-            height <- height + 3
+            # Each legend block goes on its own row at top / bottom.
+            n_legend_rows <- max(1L, legend_n)
+            legend_height <- max(1.0, legend_pad + n_legend_rows * legend_row_h)
+            height <- height + legend_height
         } else {
-            height <- height + 1.5
+            # Vertical blocks at top / bottom: add a legend-width column.
+            legend_width <- max(1.0, legend_key_w + legend_nchar * legend_char_w)
+            width <- width + legend_width
         }
     }
     unknown_args <- setdiff(names(hmargs), methods::formalArgs(ComplexHeatmap::Heatmap))
@@ -1868,11 +2103,13 @@ HeatmapAtomic <- function(
         if (identical(legend.position, "none")) {
             p <- grid.grabExpr(ComplexHeatmap::draw(p,
                 annotation_legend_list = legends,
+                padding = padding,
                 show_annotation_legend = FALSE, column_title = title
             ))
         } else {
             p <- grid.grabExpr(ComplexHeatmap::draw(p,
                 annotation_legend_list = legends,
+                padding = padding,
                 annotation_legend_side = legend.position, column_title = title
             ))
         }
@@ -1893,18 +2130,20 @@ HeatmapAtomic <- function(
         if (identical(legend.position, "none")) {
             p <- ComplexHeatmap::draw(p,
                 annotation_legend_list = legends,
+                padding = padding,
                 show_annotation_legend = FALSE, column_title = title
             )
         } else {
             p <- ComplexHeatmap::draw(p,
                 annotation_legend_list = legends,
+                padding = padding,
                 annotation_legend_side = legend.position, column_title = title
             )
         }
     }
 
-    attr(p, "height") <- max(height, 4)
-    attr(p, "width") <- max(width, 4)
+    attr(p, "height") <- max(min(height, 15), 4)
+    attr(p, "width") <- max(min(width, 15), 4)
     attr(p, "data") <- mat
     p
 }
@@ -2120,6 +2359,7 @@ Heatmap <- function(
     rows_by = NULL, rows_by_sep = "_", rows_split_by = NULL, rows_split_by_sep = "_",
     columns_by = NULL, columns_by_sep = "_", columns_split_by = NULL, columns_split_by_sep = "_",
     rows_data = NULL, columns_data = NULL, keep_na = FALSE, keep_empty = FALSE,
+    rows_orderby = NULL, columns_orderby = NULL,
     # names
     columns_name = NULL, columns_split_name = NULL,
     rows_name = NULL, rows_split_name = NULL,
@@ -2152,7 +2392,7 @@ Heatmap <- function(
     # passed to ComplexHeatmap::Heatmap
     column_name_annotation = TRUE, column_name_legend = NULL,
     row_name_annotation = TRUE, row_name_legend = NULL,
-    cluster_columns = TRUE, cluster_rows = TRUE, show_row_names = !row_name_annotation, show_column_names = !column_name_annotation,
+    cluster_columns = NULL, cluster_rows = NULL, show_row_names = !row_name_annotation, show_column_names = !column_name_annotation,
     border = TRUE, title = NULL, column_title = character(0), row_title = character(0), na_col = "grey85",
     row_names_side = "right", column_names_side = "bottom",
     column_annotation = NULL, column_annotation_side = "top", column_annotation_palette = "Paired", column_annotation_palcolor = NULL,
@@ -2160,7 +2400,7 @@ Heatmap <- function(
     row_annotation = NULL, row_annotation_side = "left", row_annotation_palette = "Paired", row_annotation_palcolor = NULL,
     row_annotation_type = "auto", row_annotation_params = list(), row_annotation_agg = NULL,
     # misc
-    flip = FALSE, alpha = 1, seed = 8525,
+    flip = FALSE, alpha = 1, seed = 8525, padding = 15,
     # cell customization
     layer_fun_callback = NULL, cell_type = c("tile", "bars", "label", "dot", "violin", "boxplot", "pie"), cell_agg = NULL,
     # subplots
@@ -2171,9 +2411,23 @@ Heatmap <- function(
     in_form <- match.arg(in_form)
     cell_type <- match.arg(cell_type)
 
+    if (!is.null(rows_orderby)) {
+        cluster_rows <- cluster_rows %||% FALSE
+        stopifnot("[Heatmap] `rows_orderby` can't be used with `cluster_rows = TRUE`" = isFALSE(cluster_rows))
+    } else {
+        cluster_rows <- cluster_rows %||% TRUE
+    }
+
+    if (!is.null(columns_orderby)) {
+        cluster_columns <- cluster_columns %||% FALSE
+        stopifnot("[Heatmap] `columns_orderby` can't be used with `cluster_columns = TRUE`" = isFALSE(cluster_columns))
+    } else {
+        cluster_columns <- cluster_columns %||% TRUE
+    }
+
     hmdata <- process_heatmap_data(
         data, in_form = in_form, values_by = values_by, name = name,
-        split_by = split_by, split_by_sep = split_by_sep,
+        split_by = split_by, split_by_sep = split_by_sep, rows_orderby = rows_orderby, columns_orderby = columns_orderby,
         rows_by = rows_by, rows_by_sep = rows_by_sep, rows_name = rows_name,
         rows_split_by = rows_split_by, rows_split_by_sep = rows_split_by_sep, rows_split_name = rows_split_name,
         columns_by = columns_by, columns_by_sep = columns_by_sep, columns_name = columns_name,

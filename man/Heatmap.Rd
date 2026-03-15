@@ -24,6 +24,8 @@ Heatmap(
   columns_data = NULL,
   keep_na = FALSE,
   keep_empty = FALSE,
+  rows_orderby = NULL,
+  columns_orderby = NULL,
   columns_name = NULL,
   columns_split_name = NULL,
   rows_name = NULL,
@@ -69,8 +71,8 @@ Heatmap(
   column_name_legend = NULL,
   row_name_annotation = TRUE,
   row_name_legend = NULL,
-  cluster_columns = TRUE,
-  cluster_rows = TRUE,
+  cluster_columns = NULL,
+  cluster_rows = NULL,
   show_row_names = !row_name_annotation,
   show_column_names = !column_name_annotation,
   border = TRUE,
@@ -97,6 +99,7 @@ Heatmap(
   flip = FALSE,
   alpha = 1,
   seed = 8525,
+  padding = 15,
   layer_fun_callback = NULL,
   cell_type = c("tile", "bars", "label", "dot", "violin", "boxplot", "pie"),
   cell_agg = NULL,
@@ -189,6 +192,15 @@ categorical/character columns used on the plot, for example, the \code{x}, \code
 But they will be assigned colors from the palette to maintain consistency across multiple plots.
 Alias: \code{levels}}
 }}
+
+\item{rows_orderby}{A expression (in character) to specify how to order rows. It will be evaluated in the context of the data frame used for rows (after grouping by rows_split_by and rows_by). The expression should return a vector of the same length as the number of rows in the data frame. The default is NULL, which means no specific ordering.
+Can't be used with cluster_rows = TRUE.
+This is applied before renaming rows_by to rows_name.}
+
+\item{columns_orderby}{A expression (in character) to specify how to order columns. It will be evaluated in the context of the data frame used for columns (after grouping by columns
+split_by and columns_by). The expression should return a vector of the same length as the number of rows in the data frame. The default is NULL, which means no specific ordering.
+Can't be used with cluster_columns = TRUE.
+This is applied before renaming columns_by to columns_name.}
 
 \item{columns_name}{A character string to rename the column created by \code{columns_by}, which will be reflected in the name of the annotation or legend.}
 
@@ -387,6 +399,16 @@ that are passed to \code{ComplexHeatmap::Heatmap()} directly.}
 \item{alpha}{A numeric value between 0 and 1 specifying the transparency of the heatmap cells.}
 
 \item{seed}{The random seed to use. Default is 8525.}
+
+\item{padding}{A numeric vector of length 4 specifying the padding of the heatmap in the order of top, right, bottom, left.
+Like padding in css. Note that it is different than the \code{padding} argument in \code{ComplexHeatmap::draw()}, which is the padding
+in the order of bottom, left, top, right.
+It also support 1, 2, 3 values like css padding.
+When 1 element is provided, it will be used for all sides.
+When 2 elements are provided, the first one will be used for top and bottom, and the second one will be used for left and right.
+When 3 elements are provided, the first one will be used for top, the second one will be used for left and right, and the third one will be used for bottom.
+When 4 elements are provided, they will be used for top, right, bottom, and left respectively.
+If no unit is provided, the default unit will be "mm".}
 
 \item{layer_fun_callback}{A function to add additional layers to the heatmap.
 The function should have the following arguments: \code{j}, \code{i}, \code{x}, \code{y}, \code{w}, \code{h}, \code{fill}, \code{sr} and \code{sc}.

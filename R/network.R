@@ -423,20 +423,15 @@ NetworkAtomic <- function(
             legend.key.width = unit(0.8, "cm")
         )
 
-    height <- width <- 5
+    dims <- calculate_plot_dimensions(
+        base_height = 5,
+        aspect.ratio = aspect.ratio,
+        legend.position = legend.position,
+        legend.direction = legend.direction
+    )
 
-    if (!identical(legend.position, "none")) {
-        if (legend.position %in% c("right", "left")) {
-            width <- width + 1
-        } else if (legend.direction == "horizontal") {
-            height <- height + 1
-        } else {
-            height <- height + 2
-        }
-    }
-
-    attr(p, "height") <- height
-    attr(p, "width") <- width
+    attr(p, "height") <- dims$height
+    attr(p, "width") <- dims$width
 
     p
 }

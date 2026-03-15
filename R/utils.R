@@ -189,6 +189,178 @@ calc_just <- function(angle) {
 }
 
 
+#' Calculate plot dimensions with aspect ratio consideration
+#'
+#' This function calculates plot height and width taking into account:
+#' - Content-based scaling (number of items on axes)
+#' - Aspect ratio constraints
+#' - Legend position and direction
+#' - Minimum and maximum dimension bounds
+#'
+#' @param base_height Base height for the plot (before legend adjustments). Default is 4.5.
+#' @param aspect.ratio Aspect ratio (height/width). If NULL, width is calculated independently.
+#' @param n_x Number of categories on x-axis (for width scaling)
+#' @param n_y Number of categories on y-axis (for height scaling)
+#' @param x_scale_factor Scaling factor per x-axis category. Default is 0.5.
+#' @param y_scale_factor Scaling factor per y-axis category. Default is 0.5.
+#' @param legend.position Position of legend ("none", "right", "left", "top", "bottom")
+#' @param legend.direction Direction of legend ("vertical" or "horizontal")
+#' @param flip Whether the plot is flipped (inverts aspect ratio)
+#' @param min_width Minimum width in inches. Default is 3.
+#' @param min_height Minimum height in inches. Default is 3.
+#' @param max_width Maximum width in inches. Default is 12.
+#' @param max_height Maximum height in inches. Default is 12.
+#' @return A list with height and width components
+#' @keywords internal
+calculate_plot_dimensions <- function(
+    base_height = 4.5,
+    aspect.ratio = 1,
+    n_x = NULL,
+    n_y = NULL,
+    x_scale_factor = 0.5,
+    y_scale_factor = 0.5,
+    legend.position = "right",
+    legend.direction = "vertical",
+    legend_n = 1,
+    legend_nchar = 5,
+    flip = FALSE,
+    min_width = 3,
+    min_height = 3,
+    max_width = 12,
+    max_height = 12
+) {
+    # Handle flip by inverting aspect ratio
+    if (isTRUE(flip) && !is.null(aspect.ratio)) {
+        aspect.ratio <- 1 / aspect.ratio
+    }
+
+    # Calculate content-based dimensions
+    if (!is.null(aspect.ratio)) {
+        # Strategy: Calculate width from content, then derive height from aspect ratio
+        if (!is.null(n_x)) {
+            # Calculate width based on x-axis content
+            content_width <- 0.5 + n_x * x_scale_factor
+            if (content_width > max_width) {
+                # Content already overflows max width: cap width and anchor height to base_height
+                width <- max_width
+                height <- base_height * aspect.ratio
+            } else {
+                # Calculate height from aspect ratio: aspect.ratio = height / width
+                height <- content_width * aspect.ratio
+                width <- content_width
+
+                # Check if this creates extreme dimensions
+                if (height < min_height || height > max_height) {
+                    # Adjust based on height constraints
+                    height <- max(min_height, min(height, max_height))
+                    width <- height / aspect.ratio
+
+                    if (width < min_width || width > max_width) {
+                        # Content requirements conflict with aspect ratio
+                        warning(
+                            "Content-based width (", round(content_width, 2),
+                            ") conflicts with aspect.ratio (", round(aspect.ratio, 2),
+                            "). Using content width; plot panel aspect ratio will differ from specified.",
+                            call. = FALSE
+                        )
+                        width <- max(min_width, min(content_width, max_width))
+                        height <- base_height
+                    }
+                }
+            }
+        } else if (!is.null(n_y)) {
+            # Calculate height based on y-axis content
+            content_height <- 0.5 + n_y * y_scale_factor
+            if (content_height > max_height) {
+                # Content already overflows max height: cap height and anchor width to base_height
+                height <- max_height
+                width <- base_height / aspect.ratio
+            } else {
+                # Calculate width from aspect ratio: width = height / aspect.ratio
+                height <- content_height
+                width <- height / aspect.ratio
+
+                # Check if this creates extreme dimensions
+                if (width < min_width || width > max_width) {
+                    # Adjust based on width constraints
+                    width <- max(min_width, min(width, max_width))
+                    height <- width * aspect.ratio
+
+                    if (height < min_height || height > max_height) {
+                        # Content requirements conflict with aspect ratio
+                        warning(
+                            "Content-based height (", round(content_height, 2),
+                            ") conflicts with aspect.ratio (", round(aspect.ratio, 2),
+                            "). Using content height; plot panel aspect ratio will differ from specified.",
+                            call. = FALSE
+                        )
+                        height <- max(min_height, min(content_height, max_height))
+                        width <- base_height / aspect.ratio
+                    }
+                }
+            }
+        } else {
+            # No content scaling, use base height and derive width from aspect ratio
+            height <- base_height
+            width <- height / aspect.ratio
+        }
+    } else {
+        # No aspect ratio constraint - calculate dimensions independently
+        height <- if (!is.null(n_y)) {
+            0.5 + n_y * y_scale_factor
+        } else {
+            base_height
+        }
+        width <- if (!is.null(n_x)) {
+            0.5 + n_x * x_scale_factor
+        } else {
+            base_height
+        }
+    }
+
+    # Ensure minimum dimensions
+    height <- max(height, min_height)
+    width <- max(width, min_width)
+
+    # Add legend space additively (after aspect ratio calculations)
+    # Legend metrics (ggplot2 defaults at 11pt text):
+    #   key:  ~0.25 in (unit(1.2, "lines") at 11pt) + internal padding
+    #   text: ~0.07 in per character  (11pt, ~0.6 aspect ratio, 1/72 in/pt)
+    #   row height (key + spacing): ~0.30 in
+    #   outer margin / title:       ~0.35 in
+    legend_key_w  <- 0.30   # key width + internal margins
+    legend_char_w <- 0.07   # inches per character of label text
+    legend_row_h  <- 0.30   # height of one stacked legend row
+    legend_pad    <- 0.35   # outer margin + optional title
+
+    if (!identical(legend.position, "none")) {
+        if (legend.position %in% c("right", "left")) {
+            # Vertical legend: width = key + text, at least 1 in
+            legend_width <- max(1.0, legend_key_w + legend_nchar * legend_char_w)
+            width <- width + legend_width
+        } else if (legend.direction == "horizontal") {
+            # Horizontal legend (bottom / top): items sit side-by-side, may wrap
+            # Estimate how many items fit per row given current (pre-legend) width
+            item_w <- max(0.5, legend_key_w + legend_nchar * legend_char_w + 0.1)
+            items_per_row <- max(1L, floor(width / item_w))
+            n_rows <- ceiling(max(1L, legend_n) / items_per_row)
+            legend_height <- max(1.0, legend_pad + n_rows * legend_row_h)
+            height <- height + legend_height
+        } else {
+            # Vertical legend at bottom / top or floating: treat like right/left
+            legend_width <- max(1.0, legend_key_w + legend_nchar * legend_char_w)
+            width <- width + legend_width
+        }
+    }
+
+    # Apply maximum bounds
+    height <- min(height, max_height)
+    width <- min(width, max_width)
+
+    list(height = height, width = width)
+}
+
+
 #' Facetting a plot
 #'
 #' @param plot The plot to facet or a list list(plot, height, width) if guess_size is TRUE

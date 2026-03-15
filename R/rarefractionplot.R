@@ -85,19 +85,16 @@ RarefactionPlotAtomic <- function(
             )
     }
 
-    height <- width <- 4.5
-    if (!identical(legend.position, "none")) {
-        if (legend.position %in% c("right", "left")) {
-            width <- width + 1
-        } else if (legend.direction == "horizontal") {
-            height <- height + 1
-        } else {
-            width <- width + 2
-        }
-    }
-
-    attr(p, "height") <- height
-    attr(p, "width") <- width
+    dims <- calculate_plot_dimensions(
+        base_height = 4.5,
+        aspect.ratio = aspect.ratio,
+        legend.position = legend.position,
+        legend.direction = legend.direction,
+        legend_n = nlevels(data[[group_by]]),
+        legend_nchar = max(nchar(levels(data[[group_by]])))
+    )
+    attr(p, "height") <- dims$height
+    attr(p, "width") <- dims$width
 
     facet_plot(p, facet_by, facet_scales, facet_nrow, facet_ncol, facet_byrow,
         legend.position = legend.position, legend.direction = legend.direction)

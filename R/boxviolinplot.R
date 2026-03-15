@@ -7,16 +7,21 @@
 #'  When `in_form` is "wide", `x` columns will not be concatenated.
 #' @param y A character string of the column name to plot on the y-axis. A numeric column is expected.
 #'  When `in_form` is "wide", `y` is not required. The values under `x` columns will be used as y-values.
-#' @param base A character string to specify the base plot type. Either "box", "violin" or "none" (used by BeeswarmPlot).
+#' @param base A character string to specify the base plot type. Either "box", "violin", "bar" or "none" (used by BeeswarmPlot).
+#'  When "bar", bars showing the mean values are plotted. This is mutually exclusive with `add_box`.
+#' @param add_errorbar A character string to specify the type of error bars to add to bar plots.
+#'  Only available when `base = "bar"`. Case insensitive. Available options are:
+#'  * "SEM" (default): Standard error of the mean.
+#'  * "SD": Standard deviation.
+#'  * "CI" or "CIXX" (e.g., "CI95"): Confidence interval. "CI" defaults to "CI95" (95\% CI).
+#'  * "none": No error bars.
+#' @param errorbar_color A character string to specify the color of the error bars. Default is "black".
+#' @param errorbar_width A numeric value to specify the width of the error bar caps. Default is 0.5.
+#' @param errorbar_linewidth A numeric value to specify the line width of the error bars. Default is 0.75.
 #' @param in_form A character string to specify the input data type. Either "long" or "wide".
-#' @param sort_x A character string to specify the sorting of x-axis, chosen from "none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median".
-#' * `none` means no sorting (as-is).
-#' * `mean_asc` sorts the x-axis by ascending mean of y-values.
-#' * `mean_desc` sorts the x-axis by descending mean of y-values.
-#' * `mean` is an alias for `mean_asc`.
-#' * `median_asc` sorts the x-axis by ascending median of y-values.
-#' * `median_desc` sorts the x-axis by descending median of y-values.
-#' * `median` is an alias for `median_asc`.
+#' @param sort_x An expression (in character string) to order x-axis.
+#' For example, "mean(y)" will order the x-axis by the mean of y. Default is NULL, which means keeping the original order of x.
+#' Note that when keep_empty is TRUE for x, the empty x levels will always be placed at the end of the x-axis.
 #' @param flip A logical value to flip the plot.
 #' @param group_by A character string of the column name to dodge the boxes/violins
 #' @param group_by_sep A character string to concatenate the columns in `group_by`, if multiple columns are provided.
@@ -111,18 +116,17 @@
 #' @return A ggplot object
 #' @keywords internal
 #' @importFrom utils combn
-#' @importFrom stats median quantile
+#' @importFrom stats median quantile sd qt
 #' @importFrom rlang sym syms parse_expr
 #' @importFrom dplyr mutate ungroup first
-#' @importFrom ggplot2 geom_boxplot geom_violin geom_jitter geom_point geom_line geom_hline geom_vline layer_data
+#' @importFrom ggplot2 geom_boxplot geom_violin geom_jitter geom_point geom_line geom_hline geom_vline layer_data geom_col geom_errorbar
 #' @importFrom ggplot2 scale_fill_manual scale_color_manual scale_shape_manual scale_linetype_manual stat_summary
 #' @importFrom ggplot2 labs theme element_line element_text position_dodge position_jitter coord_flip layer_scales
 #' @importFrom ggplot2 position_jitterdodge scale_shape_identity scale_size_manual scale_alpha_manual scale_y_continuous
 BoxViolinPlotAtomic <- function(
-    data, x, x_sep = "_", y = NULL, base = c("box", "violin", "none"), in_form = c("long", "wide"),
-    sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
+    data, x, x_sep = "_", y = NULL, base = c("box", "violin", "bar", "none"), in_form = c("long", "wide"), sort_x = NULL,
     flip = FALSE, keep_empty = FALSE, keep_na = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
+    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip), 0, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE, symnum_args = NULL,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
@@ -130,6 +134,7 @@ BoxViolinPlotAtomic <- function(
     jitter_width = NULL, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL, y_trans = "identity",
     add_beeswarm = FALSE, beeswarm_method = "swarm", beeswarm_cex = 1, beeswarm_priority = "ascending",
     beeswarm_dodge = 0.9, add_box = FALSE, box_color = "black", box_width = 0.1, box_ptsize = 2.5,
+    add_errorbar = "SEM", errorbar_color = "grey20", errorbar_width = 0.4, errorbar_linewidth = 0.6,
     add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
     add_bg = FALSE, bg_palette = "stripe", bg_palcolor = NULL, bg_alpha = 0.2,
@@ -151,6 +156,19 @@ BoxViolinPlotAtomic <- function(
         data <- data %>% pivot_longer(cols = x, names_to = ".x", values_to = ".y")
         x <- ".x"
         y <- ".y"
+        # if all values in keep_na are FALSE that means it is default
+        if (is.list(keep_na) && all(sapply(keep_na, isFALSE))) {
+            keep_na <- NULL
+        } else if (is.list(keep_na) && length(setdiff(names(keep_na), c(x, y))) > 0) {
+            warning("[Box/Violin/BeeswarmPlot] Ignoring `keep_na` for columns other than `.x` and `.y` when `in_form` is 'wide'.")
+            keep_na <- keep_na[names(keep_na) %in% c(x, y)]
+        }
+        if (is.list(keep_empty) && all(sapply(keep_empty, isFALSE))) {
+            keep_empty <- NULL
+        } else if (is.list(keep_empty) && length(setdiff(names(keep_empty), x)) > 0) {
+            warning("[Box/Violin/BeeswarmPlot] Ignoring `keep_empty` for columns other than `.x` when `in_form` is 'wide'.")
+            keep_empty <- keep_empty[names(keep_empty) %in% x]
+        }
     }
     x <- check_columns(data, x, force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = x_sep)
     y <- check_columns(data, y)
@@ -269,11 +287,6 @@ BoxViolinPlotAtomic <- function(
         )
     }
 
-
-    sort_x <- match.arg(sort_x)
-    if (sort_x != "none" && !is.null(facet_by)) {
-        stop("Cannot sort x-axis when facet_by is provided.")
-    }
     orig_data <- data
     data <- data %>%
         dplyr::group_by(!!!syms(unique(c(x, group_by, facet_by)))) %>%
@@ -324,14 +337,18 @@ BoxViolinPlotAtomic <- function(
     }
     data$.highlight <- factor(as.character(data$.highlight), levels = c("TRUE", "FALSE"))
 
-    if (sort_x == "mean" || sort_x == "mean_asc") {
-        data[[x]] <- stats::reorder(data[[x]], data$.y_mean)
-    } else if (sort_x == "mean_desc") {
-        data[[x]] <- stats::reorder(data[[x]], -data$.y_mean)
-    } else if (sort_x == "median" || sort_x == "median_asc") {
-        data[[x]] <- stats::reorder(data[[x]], data$.y_median)
-    } else if (sort_x == "median_desc") {
-        data[[x]] <- stats::reorder(data[[x]], -data$.y_median)
+    if (!is.null(sort_x)) {
+        x_levels <- data %>%
+            dplyr::group_by(!!sym(x)) %>%
+            dplyr::summarise(.sort_x = !!rlang::parse_expr(sort_x), .groups = "drop") %>%
+            dplyr::arrange(!!sym(".sort_x")) %>%
+            dplyr::pull(!!sym(x)) %>%
+            as.character()
+
+        if (!isFALSE(keep_empty_x)) {
+            x_levels <- c(x_levels, setdiff(levels(data[[x]]), x_levels))
+        }
+        data[[x]] <- factor(data[[x]], levels = x_levels)
     }
 
     if (isTRUE(flip)) {
@@ -346,6 +363,54 @@ BoxViolinPlotAtomic <- function(
     if (isTRUE(add_box) && base == "box") {
         stop("Cannot add box plot to box plot.")
     }
+    if (isTRUE(add_box) && base == "bar") {
+        stop("Cannot add box plot to bar plot.")
+    }
+
+    # Validate and parse add_errorbar
+    add_errorbar <- toupper(as.character(add_errorbar))
+    if (add_errorbar != "NONE" && base != "bar") {
+        # Silently ignore add_errorbar for non-bar bases
+        add_errorbar <- "NONE"
+    }
+    if (base == "bar" && add_errorbar != "NONE") {
+        if (add_errorbar == "CI") {
+            add_errorbar <- "CI95"
+        }
+        if (!add_errorbar %in% c("SEM", "SD") && !grepl("^CI\\d+$", add_errorbar)) {
+            stop("'add_errorbar' must be one of 'SEM', 'SD', 'CI', 'CIXX' (e.g., 'CI95'), or 'none'. Got: '", add_errorbar, "'.")
+        }
+    }
+
+    # For bar plots, adjust y_max_use/y_min_use based on mean + errorbar extent
+    if (base == "bar" && !isTRUE(add_point)) {
+        grp_cols <- unique(c(x, group_by, facet_by))
+        grp_stats <- data %>%
+            dplyr::group_by(!!!syms(grp_cols)) %>%
+            dplyr::summarise(
+                .mean = mean(!!sym(y), na.rm = TRUE),
+                .sd = sd(!!sym(y), na.rm = TRUE),
+                .n = dplyr::n(),
+                .groups = "drop"
+            )
+        if (add_errorbar == "NONE") {
+            bar_max <- max(grp_stats$.mean, na.rm = TRUE)
+        } else if (add_errorbar == "SEM") {
+            bar_max <- max(grp_stats$.mean + grp_stats$.sd / sqrt(grp_stats$.n), na.rm = TRUE)
+        } else if (add_errorbar == "SD") {
+            bar_max <- max(grp_stats$.mean + grp_stats$.sd, na.rm = TRUE)
+        } else {
+            ci_level <- as.numeric(sub("^CI", "", add_errorbar)) / 100
+            bar_max <- max(grp_stats$.mean + qt((1 + ci_level) / 2, df = pmax(grp_stats$.n - 1, 1)) * grp_stats$.sd / sqrt(grp_stats$.n), na.rm = TRUE)
+        }
+        if (is.null(y_max) || is.character(y_max)) {
+            y_max_use <- bar_max
+        }
+        if (is.null(y_min)) {
+            y_min_use <- 0
+        }
+    }
+
     fill_mode <- match.arg(fill_mode, c("dodge", "x", "mean", "median"))
     if (fill_mode == "dodge") {
         fill_by <- group_by
@@ -374,10 +439,43 @@ BoxViolinPlotAtomic <- function(
             position = position_dodge(width = 0.9), scale = "width", trim = TRUE,
             alpha = alpha, width = 0.8, show.legend = TRUE
         )
+    } else if (base == "bar") {
+        p <- p + stat_summary(
+            fun = mean, geom = "col",
+            position = position_dodge(width = 0.9),
+            width = 0.8, alpha = alpha, color = "black", show.legend = TRUE
+        )
+        if (add_errorbar != "NONE") {
+            errorbar_fun <- function(y) {
+                y <- y[!is.na(y)]
+                m <- mean(y)
+                n <- length(y)
+                s <- sd(y)
+                if (n < 2 || is.na(s)) return(data.frame(y = m, ymin = m, ymax = m))
+                if (add_errorbar == "SEM") {
+                    se <- s / sqrt(n)
+                    data.frame(y = m, ymin = m - se, ymax = m + se)
+                } else if (add_errorbar == "SD") {
+                    data.frame(y = m, ymin = m - s, ymax = m + s)
+                } else {
+                    # CI: extract level from e.g. "CI95"
+                    ci_level <- as.numeric(sub("^CI", "", add_errorbar)) / 100
+                    t_crit <- qt((1 + ci_level) / 2, df = n - 1)
+                    me <- t_crit * s / sqrt(n)
+                    data.frame(y = m, ymin = m - me, ymax = m + me)
+                }
+            }
+            p <- p + stat_summary(
+                fun.data = errorbar_fun, geom = "errorbar",
+                position = position_dodge(width = 0.9),
+                width = errorbar_width, color = errorbar_color,
+                linewidth = errorbar_linewidth, show.legend = FALSE
+            )
+        }
     }
     if (fill_mode == "dodge") {
         group_vals <- levels(data[[group_by]])
-        if (anyNA(group_vals)) group_vals <- c(group_vals, NA)
+        if (anyNA(data[[group_by]])) group_vals <- c(group_vals, NA)
         group_colors <- palette_this(group_vals, palette = palette, palcolor = palcolor, NA_keep = TRUE)
 
         if (isTRUE(keep_empty_group)) {
@@ -394,7 +492,7 @@ BoxViolinPlotAtomic <- function(
         }
     } else if (fill_mode == "x") {
         x_vals <- levels(data[[x]])
-        if (anyNA(x_vals)) x_vals <- c(x_vals, NA)
+        if (anyNA(data[[x]])) x_vals <- c(x_vals, NA)
         x_colors <- palette_this(x_vals, palette = palette, palcolor = palcolor, NA_keep = TRUE)
 
         if (isTRUE(keep_empty_x)) {
@@ -420,7 +518,7 @@ BoxViolinPlotAtomic <- function(
     }
 
     # when base is none, boxes are added as base
-    if (isTRUE(add_box) && base != "none") {
+    if (isTRUE(add_box) && !base %in% c("none", "bar")) {
         p <- p +
             new_scale_fill() +
             geom_boxplot(
@@ -475,9 +573,10 @@ BoxViolinPlotAtomic <- function(
                         yval1 <- group_data[[y]][group_data[[group_by]] == gs[1]]
                         yval2 <- group_data[[y]][group_data[[group_by]] == gs[2]]
                         # Check for zero variance or all NA
+
                         if (all(is.na(yval1)) || all(is.na(yval2)) ||
-                            (length(unique(yval1[!is.na(yval1)])) <= 1 &&
-                             length(unique(yval2[!is.na(yval2)])) <= 1)) {
+                            (length(unique(yval1[!is.na(yval1)])) <= 3 ||
+                             length(unique(yval2[!is.na(yval2)])) <= 3)) {
                             needs_fix <- TRUE
                             break
                         }
@@ -486,7 +585,7 @@ BoxViolinPlotAtomic <- function(
 
                 pwc_data <- data
                 if (needs_fix) {
-                    warning("Some pairwise comparisons may fail due to insufficient variability. Adjusting data to ensure valid comparisons.")
+                    warning("[Box/Violin/BeeswarmPlot] Some pairwise comparisons may fail due to insufficient data points or variability. Adjusting data to ensure valid comparisons.")
 
                     # Split by facet if present
                     if (!is.null(facet_by)) {
@@ -795,7 +894,6 @@ BoxViolinPlotAtomic <- function(
             if (!is.null(pt_color)) {
                 p <- p +
                     ggbeeswarm::geom_beeswarm(
-                        aes(size = !!sym(".highlight"), alpha = !!sym(".highlight")),
                         color = pt_color,
                         method = beeswarm_method,
                         cex = beeswarm_cex,
@@ -803,30 +901,38 @@ BoxViolinPlotAtomic <- function(
                         dodge.width = beeswarm_dodge,
                         show.legend = FALSE
                     )
-
             } else {
+                colors <- palette_this(levels(data[[fill_by]]), palette = palette, palcolor = palcolor)
                 p <- p +
                     ggbeeswarm::geom_beeswarm(
-                        aes(color = !!sym(fill_by), size = !!sym(".highlight"), alpha = !!sym(".highlight")),
+                        aes(color = !!sym(fill_by)),
                         method = beeswarm_method,
                         cex = beeswarm_cex,
                         priority = beeswarm_priority,
                         dodge.width = beeswarm_dodge
                     ) +
-                    scale_color_manual(
-                        values = palette_this(levels(data[[fill_by]]), palette = palette, palcolor = palcolor),
-                        guide = "legend"
+                    scale_color_manual(values = colors, guide = "legend")
+            }
+            if (any(data$.highlight == "TRUE")) {
+                p <- p +
+                    ggbeeswarm::geom_beeswarm(
+                        data = data[data$.highlight == "TRUE", , drop = FALSE],
+                        color = highlight_color,
+                        method = beeswarm_method,
+                        cex = beeswarm_cex,
+                        priority = beeswarm_priority,
+                        dodge.width = beeswarm_dodge,
+                        show.legend = FALSE
+                    ) +
+                    scale_size_manual(
+                        values = c("TRUE" = highlight_size, "FALSE" = pt_size %||% min(3000 / nrow(data), 0.6)),
+                        guide = "none"
+                    ) +
+                    scale_alpha_manual(
+                        values = c("TRUE" = highlight_alpha, "FALSE" = pt_alpha),
+                        guide = "none"
                     )
             }
-            p <- p +
-                scale_size_manual(
-                    values = c("TRUE" = highlight_size, "FALSE" = pt_size %||% min(3000 / nrow(data), 0.6)),
-                    guide = "none"
-                ) +
-                scale_alpha_manual(
-                    values = c("TRUE" = highlight_alpha, "FALSE" = pt_alpha),
-                    guide = "none"
-                )
         } else {
             # Use regular jittered points
             p <- p +
@@ -838,9 +944,9 @@ BoxViolinPlotAtomic <- function(
                     ),
                     show.legend = FALSE
                 ) +
-                scale_color_manual(values = c("TRUE" = highlight_color, "FALSE" = pt_color)) +
-                scale_size_manual(values = c("TRUE" = highlight_size, "FALSE" = pt_size %||% min(3000 / nrow(data), 0.6))) +
-                scale_alpha_manual(values = c("TRUE" = highlight_alpha, "FALSE" = pt_alpha))
+                scale_color_manual(values = c("TRUE" = highlight_color, "FALSE" = pt_color), guide = "none") +
+                scale_size_manual(values = c("TRUE" = highlight_size, "FALSE" = pt_size %||% min(3000 / nrow(data), 0.6)), guide = "none") +
+                scale_alpha_manual(values = c("TRUE" = highlight_alpha, "FALSE" = pt_alpha), guide = "none")
         }
     }
 
@@ -856,7 +962,7 @@ BoxViolinPlotAtomic <- function(
             )
             if (!is.null(group_by)) {
                 group_vals <- levels(data[[group_by]])
-                if (anyNA(group_vals)) group_vals <- c(group_vals, NA)
+                if (anyNA(data[[group_by]])) group_vals <- c(group_vals, NA)
                 group_colors <- palette_this(group_vals, palette = palette, palcolor = palcolor, NA_keep = TRUE)
 
                 if (isTRUE(keep_empty_group)) {
@@ -918,18 +1024,12 @@ BoxViolinPlotAtomic <- function(
         scale_x_discrete(drop = !isTRUE(keep_empty_x)) +
         labs(title = title, subtitle = subtitle, x = xlab %||% x, y = ylab %||% y)
 
-    p <- p + scale_y_continuous(trans = y_trans, n.breaks = y_nbreaks)
-
-    height <- width <- 0
-    if (!identical(legend.position, "none")) {
-        if (legend.position %in% c("right", "left")) {
-            width <- width + 1
-        } else if (legend.direction == "horizontal") {
-            height <- height + 1
-        } else {
-            height <- height + 2
-        }
+    if (base == "bar") {
+        p <- p + scale_y_continuous(trans = y_trans, n.breaks = y_nbreaks, expand = expansion(mult = c(0, 0.05)))
+    } else {
+        p <- p + scale_y_continuous(trans = y_trans, n.breaks = y_nbreaks)
     }
+
     x_maxchars <- max(nchar(levels(data[[x]])))
     nx <- nlevels(data[[x]])
     nd <- ifelse(is.null(group_by), 1, nlevels(data[[group_by]]))
@@ -951,8 +1051,6 @@ BoxViolinPlotAtomic <- function(
         } else {
             p <- p + coord_flip(ylim = c(y_min_use, y_max_use))
         }
-        width <- max(3, width + 2 + x_maxchars * 0.05)
-        height <- height + nx * nd * 0.3
     } else if (isTRUE(flip) && isFALSE(stack)) {
         strip_position <- "top"
         p <- p + ggplot2::theme(
@@ -964,8 +1062,6 @@ BoxViolinPlotAtomic <- function(
         } else {
             p <- p + coord_flip(ylim = c(y_min_use, y_max_use))
         }
-        width <- max(3, width + 2.2 + x_maxchars * 0.05)
-        height <- height + nx * nd * 0.3
     } else if (isTRUE(stack)) {
         facet_ncol <- facet_ncol %||% 1
         strip_position <- "right"
@@ -977,8 +1073,6 @@ BoxViolinPlotAtomic <- function(
         if (!facet_free) {
             p <- p + coord_cartesian(ylim = c(y_min_use, y_max_use))
         }
-        height <- height + 4 + x_maxchars * 0.05
-        width <- width + nx * nd * 0.3
     } else {
         strip_position <- "top"
         p <- p + ggplot2::theme(
@@ -988,8 +1082,6 @@ BoxViolinPlotAtomic <- function(
         if (!facet_free) {
             p <- p + coord_cartesian(ylim = c(y_min_use, y_max_use))
         }
-        height <- max(3, height + 2 + x_maxchars * 0.05)
-        width <- width + nx * nd * 0.3
     }
 
     p <- p +
@@ -1000,6 +1092,43 @@ BoxViolinPlotAtomic <- function(
             legend.position = legend.position,
             legend.direction = legend.direction,
         )
+
+    # Dimension calculation
+    # When flipped: nx*nd categories land on the visual y-axis (height-driven);
+    #               x-axis label chars add to width.
+    # When not flipped: nx*nd categories land on the visual x-axis (width-driven);
+    #                   x-axis label chars add to height.
+    if (isTRUE(flip)) {
+        label_min_width <- if (isTRUE(stack)) max(3, 2 + x_maxchars * 0.05) else max(3, 2.2 + x_maxchars * 0.05)
+        dims <- calculate_plot_dimensions(
+            base_height = label_min_width,
+            aspect.ratio = aspect.ratio,
+            n_y = nx * nd,
+            y_scale_factor = 0.5,
+            legend.position = legend.position,
+            legend.direction = legend.direction,
+            legend_n = nd,
+            legend_nchar = if (is.null(group_by)) 5 else max(nchar(levels(data[[group_by]]))),
+            flip = TRUE
+        )
+        height <- dims$height
+        width <- max(dims$width, label_min_width)
+    } else {
+        label_min_height <- if (isTRUE(stack)) 4 + x_maxchars * 0.05 else 2 + x_maxchars * 0.05
+        dims <- calculate_plot_dimensions(
+            base_height = label_min_height,
+            aspect.ratio = aspect.ratio,
+            n_x = nx * nd,
+            x_scale_factor = 0.5,
+            legend.position = legend.position,
+            legend.direction = legend.direction,
+            legend_n = nd,
+            legend_nchar = if (is.null(group_by)) 5 else max(nchar(levels(data[[group_by]]))),
+            flip = FALSE
+        )
+        height <- max(dims$height, label_min_height)
+        width <- dims$width
+    }
 
     attr(p, "height") <- height
     attr(p, "width") <- max(width, height)
@@ -1019,11 +1148,10 @@ BoxViolinPlotAtomic <- function(
 #' @keywords internal
 #' @importFrom rlang %||%
 BoxViolinPlot <- function(
-    data, x, x_sep = "_", y = NULL, base = c("box", "violin"), in_form = c("long", "wide"),
-    split_by = NULL, split_by_sep = "_", symnum_args = NULL,
-    sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
+    data, x, x_sep = "_", y = NULL, base = c("box", "violin", "bar", "none"), in_form = c("long", "wide"),
+    split_by = NULL, split_by_sep = "_", symnum_args = NULL, sort_x = NULL,
     flip = FALSE, keep_empty = FALSE, keep_na = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
+    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip), 0, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
@@ -1031,6 +1159,7 @@ BoxViolinPlot <- function(
     jitter_width = NULL, jitter_height = 0, stack = FALSE, y_max = NULL, y_min = NULL,
     add_beeswarm = FALSE, beeswarm_method = "swarm", beeswarm_cex = 1, beeswarm_priority = "ascending",
     beeswarm_dodge = 0.9, add_box = FALSE, box_color = "black", box_width = 0.1, box_ptsize = 2.5,
+    add_errorbar = "SEM", errorbar_color = "grey20", errorbar_width = 0.4, errorbar_linewidth = 0.6,
     add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
     add_bg = FALSE, bg_palette = "stripe", bg_palcolor = NULL, bg_alpha = 0.2,
@@ -1068,6 +1197,7 @@ BoxViolinPlot <- function(
     legend.position <- check_legend(legend.position, names(datas), "legend.position")
 
     stat_name <- stat_name %||% paste0(y, " (", deparse(substitute(add_stat)), ")")
+    base <- match.arg(base)
 
     plots <- lapply(
         names(datas), function(nm) {
@@ -1087,6 +1217,7 @@ BoxViolinPlot <- function(
                 jitter_width = jitter_width, jitter_height = jitter_height, stack = stack, y_max = y_max, y_min = y_min,
                 add_beeswarm = add_beeswarm, beeswarm_method = beeswarm_method, beeswarm_cex = beeswarm_cex, beeswarm_priority = beeswarm_priority,
                 beeswarm_dodge = beeswarm_dodge, add_box = add_box, box_color = box_color, box_width = box_width, box_ptsize = box_ptsize,
+                add_errorbar = add_errorbar, errorbar_color = errorbar_color, errorbar_width = errorbar_width, errorbar_linewidth = errorbar_linewidth,
                 add_trend = add_trend, trend_color = trend_color, trend_linewidth = trend_linewidth, trend_ptsize = trend_ptsize,
                 add_stat = add_stat, stat_name = stat_name, stat_color = stat_color, stat_size = stat_size, stat_stroke = stat_stroke, stat_shape = stat_shape,
                 add_bg = add_bg, bg_palette = bg_palette, bg_palcolor = bg_palcolor, bg_alpha = bg_alpha,
@@ -1105,10 +1236,11 @@ BoxViolinPlot <- function(
         axes = axes, axis_titles = axis_titles, guides = guides, design = design)
 }
 
-#' Box / Violin Plot
+#' Box / Violin / Bar Plot
 #'
 #' @description
-#'  Box plot or violin plot with optional jitter points, trend line, statistical test, background, line, and highlight.
+#'  Box plot, bar plot (mean values), or violin plot with optional jitter points, trend line, statistical test, background, line, and highlight.
+#'  When `base = "bar"`, bars show the mean values with optional error bars (SEM, SD, or CI).
 #' @rdname boxviolinplot
 #' @return The Box / Violin plot(s).
 #'  When `split_by` is not provided, it returns a ggplot object.
@@ -1139,6 +1271,16 @@ BoxViolinPlot <- function(
 #'     add_bg = TRUE, bg_palette = "Paired",
 #'     palcolor = list(g1 = c("red", "blue"), g2 = c("blue", "red"))
 #' )
+#'
+#' # sort_x
+#' data <- data.frame(
+#'   x = factor(rep(LETTERS[1:5], each = 40),
+#'      levels = c(LETTERS[1:2], "unused", LETTERS[3:5])),
+#'   y = c(rnorm(40, mean = 5), rnorm(40, mean = 4), rnorm(40, mean = 3),
+#'      rnorm(40, mean = 2), rnorm(40, mean = 1))
+#' )
+#' BoxPlot(data, x = "x", y = "y", sort_x = "mean(y)", keep_empty = TRUE)
+#' BoxPlot(data, x = "x", y = "y", sort_x = "mean(-y)", keep_empty = TRUE)
 #'
 #' # wide form data
 #' data_wide <- data.frame(
@@ -1208,13 +1350,23 @@ BoxViolinPlot <- function(
 #'     keep_empty = list(x = TRUE, group2 = FALSE),
 #'     title = "keep_na: x=FALSE, group2=TRUE\nkeep_empty: x=TRUE, group2=FALSE"
 #' )
+#'
+#' # Bar plot (base = "bar") shows mean values with error bars
+#' data$y <- abs(data$y)  # make y values positive for better bar plot visualization
+#' BoxPlot(data, x = "x", y = "y", base = "bar")
+#' BoxPlot(data, x = "x", y = "y", base = "bar", add_errorbar = "SD")
+#' BoxPlot(data, x = "x", y = "y", base = "bar", add_errorbar = "CI95")
+#' BoxPlot(data, x = "x", y = "y", base = "bar", add_errorbar = "none")
+#' BoxPlot(data, x = "x", y = "y", base = "bar", group_by = "group1")
+#' BoxPlot(data, x = "x", y = "y", base = "bar", add_point = TRUE)
+#' BoxPlot(data, x = "x", y = "y", base = "bar",
+#'     fill_mode = "mean", palette = "Blues")
 #' }
 BoxPlot <- function(
-    data, x, x_sep = "_", y = NULL, in_form = c("long", "wide"),
-    split_by = NULL, split_by_sep = "_", symnum_args = NULL,
-    sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
+    data, x, x_sep = "_", y = NULL, base = c("box", "bar"), in_form = c("long", "wide"),
+    split_by = NULL, split_by_sep = "_", symnum_args = NULL, sort_x = NULL,
     flip = FALSE, keep_empty = FALSE, keep_na = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
+    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip), 0, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
@@ -1223,6 +1375,7 @@ BoxPlot <- function(
     add_beeswarm = FALSE, beeswarm_method = "swarm", beeswarm_cex = 1, beeswarm_priority = "ascending",
     beeswarm_dodge = 0.9, add_trend = FALSE, trend_color = NULL, trend_linewidth = 1, trend_ptsize = 2,
     add_stat = NULL, stat_name = NULL, stat_color = "black", stat_size = 1, stat_stroke = 1, stat_shape = 25,
+    add_errorbar = "SEM", errorbar_color = "grey20", errorbar_width = 0.4, errorbar_linewidth = 0.6,
     add_bg = FALSE, bg_palette = "stripe", bg_palcolor = NULL, bg_alpha = 0.2,
     add_line = NULL, line_color = "red2", line_width = .6, line_type = 2,
     highlight = NULL, highlight_color = "red2", highlight_size = 1, highlight_alpha = 1,
@@ -1233,9 +1386,10 @@ BoxPlot <- function(
     title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL, seed = 8525,
     combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE,
     axes = NULL, axis_titles = axes, guides = NULL, ...) {
+    base <- match.arg(base)
     stat_name <- stat_name %||% paste0(y, " (", deparse(substitute(add_stat)), ")")
     BoxViolinPlot(
-        data = data, x = x, x_sep = x_sep, y = y, base = "box", in_form = in_form,
+        data = data, x = x, x_sep = x_sep, y = y, base = base, in_form = in_form,
         split_by = split_by, split_by_sep = split_by_sep,
         sort_x = sort_x, flip = flip, keep_empty = keep_empty, keep_na = keep_na, group_by = group_by, group_by_sep = group_by_sep, group_name = group_name,
         paired_by = paired_by, x_text_angle = x_text_angle, fill_mode = fill_mode, fill_reverse = fill_reverse, step_increase = step_increase,
@@ -1246,6 +1400,7 @@ BoxPlot <- function(
         add_beeswarm = add_beeswarm, beeswarm_method = beeswarm_method, beeswarm_cex = beeswarm_cex, beeswarm_priority = beeswarm_priority,
         beeswarm_dodge = beeswarm_dodge, add_trend = add_trend, trend_color = trend_color, trend_linewidth = trend_linewidth, trend_ptsize = trend_ptsize,
         add_stat = add_stat, stat_name = stat_name, stat_color = stat_color, stat_size = stat_size, stat_stroke = stat_stroke, stat_shape = stat_shape,
+        add_errorbar = add_errorbar, errorbar_color = errorbar_color, errorbar_width = errorbar_width, errorbar_linewidth = errorbar_linewidth,
         add_bg = add_bg, bg_palette = bg_palette, bg_palcolor = bg_palcolor, bg_alpha = bg_alpha,
         add_line = add_line, line_color = line_color, line_width = line_width, line_type = line_type,
         highlight = highlight, highlight_color = highlight_color, highlight_size = highlight_size, highlight_alpha = highlight_alpha,
@@ -1302,10 +1457,9 @@ BoxPlot <- function(
 #' }
 ViolinPlot <- function(
     data, x, x_sep = "_", y = NULL, in_form = c("long", "wide"),
-    split_by = NULL, split_by_sep = "_", symnum_args = NULL,
-    sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
+    split_by = NULL, split_by_sep = "_", symnum_args = NULL, sort_x = NULL,
     flip = FALSE, keep_empty = FALSE, keep_na = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
+    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip), 0, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
@@ -1377,10 +1531,9 @@ ViolinPlot <- function(
 #' }
 BeeswarmPlot <- function(
     data, x, x_sep = "_", y = NULL, in_form = c("long", "wide"),
-    split_by = NULL, split_by_sep = "_", symnum_args = NULL,
-    sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median"),
+    split_by = NULL, split_by_sep = "_", symnum_args = NULL, sort_x = NULL,
     flip = FALSE, keep_empty = FALSE, keep_na = FALSE, group_by = NULL, group_by_sep = "_", group_name = NULL,
-    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45), step_increase = 0.1,
+    paired_by = NULL, x_text_angle = ifelse(isTRUE(flip), 0, 45), step_increase = 0.1,
     fill_mode = ifelse(!is.null(group_by), "dodge", "x"), fill_reverse = FALSE,
     theme = "theme_this", theme_args = list(), palette = "Paired", palcolor = NULL, alpha = 1,
     aspect.ratio = NULL, legend.position = "right", legend.direction = "vertical",
@@ -1404,6 +1557,7 @@ BeeswarmPlot <- function(
         stop("Adding violin to a beeswarm plot is not supported. Please use ViolinPlot(..., add_beeswarm = TRUE) instead.")
     }
     stat_name <- stat_name %||% paste0(y, " (", deparse(substitute(add_stat)), ")")
+
     BoxViolinPlot(
         data = data, x = x, x_sep = x_sep, y = y, base = "none", in_form = in_form,
         split_by = split_by, split_by_sep = split_by_sep,

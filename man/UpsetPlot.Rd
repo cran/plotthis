@@ -17,7 +17,7 @@ UpsetPlot(
   label_size = NULL,
   label_bg = "white",
   label_bg_r = 0.1,
-  palette = "material-indigo",
+  palette = "Blues",
   palcolor = NULL,
   alpha = 1,
   specific = TRUE,
@@ -35,6 +35,7 @@ UpsetPlot(
   ncol = NULL,
   byrow = TRUE,
   seed = 8525,
+  combmatrix_gap = 6,
   axes = NULL,
   axis_titles = axes,
   guides = NULL,
@@ -156,6 +157,10 @@ if \code{waiver()}, for single groups, the legend will be "none", otherwise "rig
 
 \item{seed}{The random seed to use. Default is 8525.}
 
+\item{combmatrix_gap}{A numeric value specifying the gap between the rows of the combination matrix.
+The default value is 6, which is suitable for a base_size of 12.
+The actual gap will be scaled by the text size scale, which is calculated as base_size / 12.}
+
 \item{axes}{A string specifying how axes should be treated. Passed to \code{\link[patchwork:wrap_plots]{patchwork::wrap_plots()}}.
 Only relevant when \code{split_by} is used and \code{combine} is TRUE.
 Options are:
@@ -196,6 +201,7 @@ A ggplot object or wrap_plots object or a list of ggplot objects
 Upset Plot
 }
 \examples{
+\donttest{
 data <- list(
     A = 1:5,
     B = 2:6,
@@ -205,4 +211,25 @@ data <- list(
 UpsetPlot(data)
 UpsetPlot(data, label = FALSE)
 UpsetPlot(data, palette = "Reds", specific = FALSE)
+
+# long form input
+data_long <- data.frame(
+    group_by = factor(
+         c(rep("A", 5), rep("B", 5), rep("C", 5), rep("D", 5)),
+         levels = c("A", "B", "C", "D")
+    ),
+    id_by = c(1:5, 2:6, 3:7, 4:8)
+)
+UpsetPlot(data_long, in_form = "long", group_by = "group_by", id_by = "id_by")
+
+# wide form input
+data <- data.frame(
+    id = LETTERS[1:10],
+    B = c(1, 0, 1, 1, 0, 0, 1, 0, 1, 0),
+    A = c(1, 1, 1, 0, 0, 1, 0, 0, 1, 0),
+    D = c(1, 0, 0, 1, 1, 0, 0, 1, 0, 1),
+    C = c(0, 1, 1, 0, 1, 0, 1, 0, 1, 0)
+)
+UpsetPlot(data, in_form = "wide", id_by = "id", n_intersections = 4)
+}
 }

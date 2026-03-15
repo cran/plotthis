@@ -4,19 +4,19 @@
 \alias{BoxPlot}
 \alias{ViolinPlot}
 \alias{BeeswarmPlot}
-\title{Box / Violin Plot}
+\title{Box / Violin / Bar Plot}
 \usage{
 BoxPlot(
   data,
   x,
   x_sep = "_",
   y = NULL,
+  base = c("box", "bar"),
   in_form = c("long", "wide"),
   split_by = NULL,
   split_by_sep = "_",
   symnum_args = NULL,
-  sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc",
-    "median"),
+  sort_x = NULL,
   flip = FALSE,
   keep_empty = FALSE,
   keep_na = FALSE,
@@ -24,7 +24,7 @@ BoxPlot(
   group_by_sep = "_",
   group_name = NULL,
   paired_by = NULL,
-  x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45),
+  x_text_angle = ifelse(isTRUE(flip), 0, 45),
   step_increase = 0.1,
   fill_mode = ifelse(!is.null(group_by), "dodge", "x"),
   fill_reverse = FALSE,
@@ -60,6 +60,10 @@ BoxPlot(
   stat_size = 1,
   stat_stroke = 1,
   stat_shape = 25,
+  add_errorbar = "SEM",
+  errorbar_color = "grey20",
+  errorbar_width = 0.4,
+  errorbar_linewidth = 0.6,
   add_bg = FALSE,
   bg_palette = "stripe",
   bg_palcolor = NULL,
@@ -109,8 +113,7 @@ ViolinPlot(
   split_by = NULL,
   split_by_sep = "_",
   symnum_args = NULL,
-  sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc",
-    "median"),
+  sort_x = NULL,
   flip = FALSE,
   keep_empty = FALSE,
   keep_na = FALSE,
@@ -118,7 +121,7 @@ ViolinPlot(
   group_by_sep = "_",
   group_name = NULL,
   paired_by = NULL,
-  x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45),
+  x_text_angle = ifelse(isTRUE(flip), 0, 45),
   step_increase = 0.1,
   fill_mode = ifelse(!is.null(group_by), "dodge", "x"),
   fill_reverse = FALSE,
@@ -207,8 +210,7 @@ BeeswarmPlot(
   split_by = NULL,
   split_by_sep = "_",
   symnum_args = NULL,
-  sort_x = c("none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc",
-    "median"),
+  sort_x = NULL,
   flip = FALSE,
   keep_empty = FALSE,
   keep_na = FALSE,
@@ -216,7 +218,7 @@ BeeswarmPlot(
   group_by_sep = "_",
   group_name = NULL,
   paired_by = NULL,
-  x_text_angle = ifelse(isTRUE(flip) && isTRUE(stack), 90, 45),
+  x_text_angle = ifelse(isTRUE(flip), 0, 45),
   step_increase = 0.1,
   fill_mode = ifelse(!is.null(group_by), "dodge", "x"),
   fill_reverse = FALSE,
@@ -305,6 +307,9 @@ When \code{in_form} is "wide", \code{x} columns will not be concatenated.}
 
 \item{y}{A character string specifying the column name of the data frame to plot for the y-axis.}
 
+\item{base}{A character string to specify the base plot type. Either "box", "violin", "bar" or "none" (used by BeeswarmPlot).
+When "bar", bars showing the mean values are plotted. This is mutually exclusive with \code{add_box}.}
+
 \item{in_form}{A character string to specify the input data type. Either "long" or "wide".}
 
 \item{split_by}{The column(s) to split data by and plot separately.}
@@ -322,16 +327,9 @@ In other words, we use the following convention for symbols indicating statistic
 \item \verb{****}: p <= 0.0001
 }}
 
-\item{sort_x}{A character string to specify the sorting of x-axis, chosen from "none", "mean_asc", "mean_desc", "mean", "median_asc", "median_desc", "median".
-\itemize{
-\item \code{none} means no sorting (as-is).
-\item \code{mean_asc} sorts the x-axis by ascending mean of y-values.
-\item \code{mean_desc} sorts the x-axis by descending mean of y-values.
-\item \code{mean} is an alias for \code{mean_asc}.
-\item \code{median_asc} sorts the x-axis by ascending median of y-values.
-\item \code{median_desc} sorts the x-axis by descending median of y-values.
-\item \code{median} is an alias for \code{median_asc}.
-}}
+\item{sort_x}{An expression (in character string) to order x-axis.
+For example, "mean(y)" will order the x-axis by the mean of y. Default is NULL, which means keeping the original order of x.
+Note that when keep_empty is TRUE for x, the empty x levels will always be placed at the end of the x-axis.}
 
 \item{flip}{A logical value to flip the plot.}
 
@@ -455,6 +453,21 @@ This won't work when \code{group_by} is specified, the trend line will be colore
 \item{stat_stroke}{A numeric value to specify the stroke of the statistical test.}
 
 \item{stat_shape}{A numeric value to specify the shape of the statistical test.}
+
+\item{add_errorbar}{A character string to specify the type of error bars to add to bar plots.
+Only available when \code{base = "bar"}. Case insensitive. Available options are:
+\itemize{
+\item "SEM" (default): Standard error of the mean.
+\item "SD": Standard deviation.
+\item "CI" or "CIXX" (e.g., "CI95"): Confidence interval. "CI" defaults to "CI95" (95\\% CI).
+\item "none": No error bars.
+}}
+
+\item{errorbar_color}{A character string to specify the color of the error bars. Default is "black".}
+
+\item{errorbar_width}{A numeric value to specify the width of the error bar caps. Default is 0.5.}
+
+\item{errorbar_linewidth}{A numeric value to specify the line width of the error bars. Default is 0.75.}
 
 \item{add_bg}{A logical value to add background to the plot.}
 
@@ -593,7 +606,8 @@ When \code{split_by} is provided, it returns a object of plots wrapped by \code{
 otherwise, it returns a list of ggplot objects.
 }
 \description{
-Box plot or violin plot with optional jitter points, trend line, statistical test, background, line, and highlight.
+Box plot, bar plot (mean values), or violin plot with optional jitter points, trend line, statistical test, background, line, and highlight.
+When \code{base = "bar"}, bars show the mean values with optional error bars (SEM, SD, or CI).
 }
 \examples{
 \donttest{
@@ -618,6 +632,16 @@ BoxPlot(data,
     add_bg = TRUE, bg_palette = "Paired",
     palcolor = list(g1 = c("red", "blue"), g2 = c("blue", "red"))
 )
+
+# sort_x
+data <- data.frame(
+  x = factor(rep(LETTERS[1:5], each = 40),
+     levels = c(LETTERS[1:2], "unused", LETTERS[3:5])),
+  y = c(rnorm(40, mean = 5), rnorm(40, mean = 4), rnorm(40, mean = 3),
+     rnorm(40, mean = 2), rnorm(40, mean = 1))
+)
+BoxPlot(data, x = "x", y = "y", sort_x = "mean(y)", keep_empty = TRUE)
+BoxPlot(data, x = "x", y = "y", sort_x = "mean(-y)", keep_empty = TRUE)
 
 # wide form data
 data_wide <- data.frame(
@@ -687,6 +711,17 @@ BoxPlot(data, x = "x", y = "y", group_by = "group2",
     keep_empty = list(x = TRUE, group2 = FALSE),
     title = "keep_na: x=FALSE, group2=TRUE\nkeep_empty: x=TRUE, group2=FALSE"
 )
+
+# Bar plot (base = "bar") shows mean values with error bars
+data$y <- abs(data$y)  # make y values positive for better bar plot visualization
+BoxPlot(data, x = "x", y = "y", base = "bar")
+BoxPlot(data, x = "x", y = "y", base = "bar", add_errorbar = "SD")
+BoxPlot(data, x = "x", y = "y", base = "bar", add_errorbar = "CI95")
+BoxPlot(data, x = "x", y = "y", base = "bar", add_errorbar = "none")
+BoxPlot(data, x = "x", y = "y", base = "bar", group_by = "group1")
+BoxPlot(data, x = "x", y = "y", base = "bar", add_point = TRUE)
+BoxPlot(data, x = "x", y = "y", base = "bar",
+    fill_mode = "mean", palette = "Blues")
 }
 \donttest{
 ViolinPlot(data, x = "x", y = "y")

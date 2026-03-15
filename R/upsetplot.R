@@ -107,22 +107,34 @@ prepare_upset_data <- function(data, in_form = "auto", group_by = NULL, group_by
     process_upset_data <- getFromNamespace("process_upset_data", "ggVennDiagram")
     if (in_form == "list") {
         listdata <- data
+        group_order <- names(listdata)
     } else if (in_form == "long") {
         group_by <- check_columns(data, group_by, force_factor = TRUE, allow_multi = TRUE, concat_multi = TRUE, concat_sep = group_by_sep)
+        group_order <- levels(data[[group_by]])
         listdata <- split(data[[id_by]], data[[group_by]])
     } else { # in_form == "wide"
         group_by <- check_columns(data, group_by, allow_multi = TRUE)
         if (is.null(group_by)) {
-            group_by <- colnames(data)
+            group_by <- setdiff(colnames(data), id_by)
         }
+        group_order <- group_by
         for (g in group_by) {
             # columns must be logical or 0/1
             if (!is.logical(data[[g]]) && !all(data[[g]] %in% c(0, 1))) {
-                stop("The columns in group_by must be logical or 0/1 when the in_form is 'wide'.")
+                stop("[UpSetPlot] The columns in group_by must be logical or 0/1 when the in_form is 'wide', but column '", g, "' is not.")
             }
         }
-        data$.id <- paste0("id", seq_len(nrow(data)))
-        listdata <- lapply(group_by, function(g) data[as.logical(data[[g]]), ".id", drop = TRUE])
+        id_by <- check_columns(data, id_by)
+        if (is.null(id_by)) {
+            id_by <- ".id"
+            data$.id <- paste0("id", seq_len(nrow(data)))
+        } else {
+            # check if id_by column values are unique
+            if (any(duplicated(data[[id_by]]))) {
+                stop("[UpSetPlot] The values in id_by column must be unique when the in_form is 'wide', but there are duplicated values in column '", id_by, "'.")
+            }
+        }
+        listdata <- lapply(group_by, function(g) data[as.logical(data[[g]]), id_by, drop = TRUE])
         names(listdata) <- group_by
         for (nm in names(listdata)) {
             if (length(listdata[[nm]]) == 0) {
@@ -143,7 +155,9 @@ prepare_upset_data <- function(data, in_form = "auto", group_by = NULL, group_by
         idnames[strsplit(x, sep, fixed = TRUE)[[1]]]
     })
 
-    uncount(data, !!sym("size"))
+    out <- uncount(data, !!sym("size"))
+    attr(out, "group_order") <- group_order
+    out
 }
 
 #' Atomic Upset plot
@@ -155,16 +169,21 @@ prepare_upset_data <- function(data, in_form = "auto", group_by = NULL, group_by
 #' @param label_size A numeric value specifying the size of the label text.
 #' @param label_bg A character string specifying the background color of the label.
 #' @param label_bg_r A numeric value specifying the radius of the background of the label.
+#' @param combmatrix_gap A numeric value specifying the gap between the rows of the combination matrix.
+#' The default value is 6, which is suitable for a base_size of 12.
+#' The actual gap will be scaled by the text size scale, which is calculated as base_size / 12.
 #' @param ... Additional arguments passed to [ggupset::scale_x_upset].
 #' @return A ggplot object with Upset plot
 #' @keywords internal
-#' @importFrom rlang %||%
+#' @importFrom rlang %||% sym
 #' @importFrom ggplot2 geom_bar labs guide_colorbar scale_fill_gradientn
+#' @importFrom ggplot2 aes geom_rect geom_point geom_line scale_x_continuous expansion
+#' @importFrom ggplot2 scale_fill_manual scale_color_manual guides element_blank unit
 #' @importFrom ggrepel geom_text_repel
 UpsetPlotAtomic <- function(
     data, in_form = "auto", group_by = NULL, group_by_sep = "_", id_by = NULL,
     label = TRUE, label_fg = "black", label_size = NULL, label_bg = "white", label_bg_r = 0.1,
-    palette = "material-indigo", palcolor = NULL, alpha = 1, specific = TRUE,
+    palette = "material-indigo", palcolor = NULL, alpha = 1, specific = TRUE, combmatrix_gap = 6,
     theme = "theme_this", theme_args = list(), title = NULL, subtitle = NULL, xlab = NULL, ylab = NULL,
     aspect.ratio = 0.6, legend.position = "right", legend.direction = "vertical", levels = NULL, ...) {
     ggplot <- if (getOption("plotthis.gglogger.enabled", FALSE)) {
@@ -174,6 +193,8 @@ UpsetPlotAtomic <- function(
     }
 
     data <- prepare_upset_data(data, in_form, group_by, group_by_sep, id_by, specific)
+    group_order <- attr(data, "group_order")
+
     base_size <- theme_args$base_size %||% 12
     text_size_scale <- base_size / 12
 
@@ -192,14 +213,22 @@ UpsetPlotAtomic <- function(
         p <- p + geom_text_repel(aes(label = after_stat(!!sym("count"))),
             stat = "count",
             colour = label_fg, size = label_size %||% text_size_scale * 3.5,
-            bg.color = label_bg, bg.r = label_bg_r,
+            bg.color = label_bg, bg.r = label_bg_r, nudge_y = 0.08 * text_size_scale,
             point.size = NA, max.overlaps = 100, force = 0,
-            min.segment.length = 0, segment.colour = "black"
+            min.segment.length = 0, segment.colour = NA
         )
     }
+    upset_args <- list(...)
+    ytrans <- upset_args$ytrans %||% "identity"
+
+    # scale_x_upset() internally calls axis_combmatrix(), bundling a CoordCombMatrix into its
+    # return list. We extract only the ScaleUpset (index [[1]]) and discard the bundled
+    # CoordCombMatrix (index [[2]]), then add our own axis_combmatrix() once — avoiding
+    # a second coord system replacement and its "Coordinate system already present" message.
+    scale_x_upset_res <- ggupset::scale_x_upset(...)
     p <- p +
         labs(title = title, subtitle = subtitle, x = xlab %||% "", y = ylab %||% "Intersection size") +
-        ggupset::scale_x_upset(...) +
+        scale_x_upset_res[[1]] +
         do.call(theme, theme_args) +
         ggplot2::theme(
             aspect.ratio = aspect.ratio,
@@ -207,32 +236,69 @@ UpsetPlotAtomic <- function(
             legend.direction = legend.direction,
             panel.grid.major = element_line(colour = "grey80", linetype = 2)
         ) +
-        ggupset::theme_combmatrix(
-            combmatrix.label.text = element_text(size = 12, color = "black"),
-            combmatrix.label.extra_spacing = 6
-        )
+        # try to keep the group order in combmatrix
+        ggupset::axis_combmatrix(sep = " // ", ytrans = ytrans, override_plotting_function = function(df) {
+            # df$single_label <- factor(df$single_label, levels = group_order)
+            # single_label is something like: 'C (5)''B (5)''D (5)''A (5)'
+            # but group_order is something like: 'A', 'B', 'C', 'D'
+            # so we need to extract the group name from single_label and match it with group_order
+            df$group_name <- sapply(as.character(df$single_label), function(x) {
+                # extract the group name from single_label, which is the part before the first " ("
+                strsplit(x, " (", fixed = TRUE)[[1]][1]
+            })
+            df$group_name <- factor(df$group_name, levels = rev(group_order))
+            df <- df[order(df$group_name), , drop = FALSE]
+            df$single_label <- factor(df$single_label, levels = unique(df$single_label))
+            ggplot(df, aes(x = !!sym("at"), y = !!sym("single_label"))) +
+                geom_rect(
+                    aes(fill = !!sym("index") %% 2 == 0), ymin = df$index - 0.5,
+                        ymax = df$index + 0.5, xmin = 0, xmax = 1) +
+                geom_point(aes(color = !!sym("observed")), size = text_size_scale * 3) +
+                geom_line(data = function(dat) dat[dat$observed, , drop = FALSE],
+                    aes(group = !!sym("labels")), linewidth = 1.2 * text_size_scale) +
+                ggplot2::ylab("") + ggplot2::xlab("") +
+                scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+                scale_y_discrete(expand = c(0, 0)) +
+                scale_fill_manual(values= c(`TRUE` = "white", `FALSE` = "#F7F7F7")) +
+                scale_color_manual(values= c(`TRUE` = "black", `FALSE` = "#E0E0E0")) +
+                guides(color = "none", fill = "none") +
+                ggplot2::theme(
+                    panel.background = element_blank(),
+                    axis.text.x = element_blank(),
+                    axis.text.y = element_text(size = 12 * text_size_scale^0.7, color = "black"),
+                    axis.ticks.y = element_blank(),
+                    axis.ticks.length = unit(0, "pt"),
+                    axis.title.y = element_blank(),
+                    axis.title.x = element_blank(),
+                    axis.line = element_blank(),
+                    panel.border = element_blank()
+                )
+        }) +
+        ggupset::theme_combmatrix(combmatrix.label.extra_spacing = combmatrix_gap * text_size_scale)
 
-    upset_args <- list(...)
     n_sets <- upset_args$n_sets %||% 99
     n_sets <- min(n_sets, length(unique(unlist(data$Intersection))))
     n_intersections <- upset_args$n_intersections %||% 99
     n_intersections <- min(n_intersections, length(unique(data$Intersection)))
     maxchars <- max(sapply(unique(unlist(data$Intersection)), nchar))
 
-    height <- 4.5 + n_sets * 0.5
-    width <- n_intersections * aspect.ratio + maxchars * 0.05
-    if (!identical(legend.position, "none")) {
-        if (legend.position %in% c("right", "left")) {
-            width <- width + 1
-        } else if (legend.direction == "horizontal") {
-            height <- height + 1
-        } else {
-            width <- width + 2
-        }
-    }
+    # Height driven by number of sets; width driven by number of intersections.
+    # x_scale_factor = 0.6 preserves the original per-intersection width (the original
+    # default aspect.ratio = 0.6 was used as a width-per-intersection scale, not H/W ratio).
+    # aspect.ratio is now used as the standard H/W ratio coupling.
+    dims <- calculate_plot_dimensions(
+        base_height = 4.5 + n_sets * 0.5,
+        aspect.ratio = aspect.ratio,
+        n_x = n_intersections,
+        x_scale_factor = 0.6,
+        legend.position = legend.position,
+        legend.direction = legend.direction,
+        legend_n = n_sets,
+        legend_nchar = maxchars
+    )
 
-    attr(p, "height") <- height
-    attr(p, "width") <- width
+    attr(p, "height") <- dims$height
+    attr(p, "width") <- dims$width + maxchars * 0.05
 
     p
 }
@@ -244,6 +310,7 @@ UpsetPlotAtomic <- function(
 #' @return A ggplot object or wrap_plots object or a list of ggplot objects
 #' @export
 #' @examples
+#' \donttest{
 #' data <- list(
 #'     A = 1:5,
 #'     B = 2:6,
@@ -253,13 +320,34 @@ UpsetPlotAtomic <- function(
 #' UpsetPlot(data)
 #' UpsetPlot(data, label = FALSE)
 #' UpsetPlot(data, palette = "Reds", specific = FALSE)
+#'
+#' # long form input
+#' data_long <- data.frame(
+#'     group_by = factor(
+#'          c(rep("A", 5), rep("B", 5), rep("C", 5), rep("D", 5)),
+#'          levels = c("A", "B", "C", "D")
+#'     ),
+#'     id_by = c(1:5, 2:6, 3:7, 4:8)
+#' )
+#' UpsetPlot(data_long, in_form = "long", group_by = "group_by", id_by = "id_by")
+#'
+#' # wide form input
+#' data <- data.frame(
+#'     id = LETTERS[1:10],
+#'     B = c(1, 0, 1, 1, 0, 0, 1, 0, 1, 0),
+#'     A = c(1, 1, 1, 0, 0, 1, 0, 0, 1, 0),
+#'     D = c(1, 0, 0, 1, 1, 0, 0, 1, 0, 1),
+#'     C = c(0, 1, 1, 0, 1, 0, 1, 0, 1, 0)
+#' )
+#' UpsetPlot(data, in_form = "wide", id_by = "id", n_intersections = 4)
+#' }
 UpsetPlot <- function(
     data, in_form = c("auto", "long", "wide", "list", "upset"), split_by = NULL, split_by_sep = "_",
     group_by = NULL, group_by_sep = "_", id_by = NULL, label = TRUE, label_fg = "black",
-    label_size = NULL, label_bg = "white", label_bg_r = 0.1, palette = "material-indigo", palcolor = NULL,
+    label_size = NULL, label_bg = "white", label_bg_r = 0.1, palette = "Blues", palcolor = NULL,
     alpha = 1, specific = TRUE, theme = "theme_this", theme_args = list(), title = NULL, subtitle = NULL,
     xlab = NULL, ylab = NULL, aspect.ratio = 0.6, legend.position = "right", legend.direction = "vertical",
-    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525,
+    combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, seed = 8525, combmatrix_gap = 6,
     axes = NULL, axis_titles = axes, guides = NULL, design = NULL, ...) {
     validate_common_args(seed)
     in_form <- match.arg(in_form)
@@ -295,7 +383,7 @@ UpsetPlot <- function(
                 group_by <- setdiff(colnames(datas[[nm]]), c(id_by, split_by))
             }
             UpsetPlotAtomic(datas[[nm]],
-                in_form = in_form, group_by = group_by, group_by_sep = group_by_sep, id_by = id_by,
+                in_form = in_form, group_by = group_by, group_by_sep = group_by_sep, id_by = id_by, combmatrix_gap = combmatrix_gap,
                 label = label, label_fg = label_fg, label_size = label_size, label_bg = label_bg, label_bg_r = label_bg_r,
                 palette = palette[[nm]], palcolor = palcolor[[nm]], alpha = alpha, specific = specific,
                 theme = theme, theme_args = theme_args, title = title, subtitle = subtitle, xlab = xlab, ylab = ylab,
