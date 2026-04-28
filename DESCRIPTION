@@ -1,7 +1,7 @@
 Package: plotthis
 Title: High-Level Plotting Built Upon 'ggplot2' and Other Plotting
         Packages
-Version: 0.11.1
+Version: 0.12.0
 Authors@R: 
     person("Panwen", "Wang", , "pwwang@pwwang.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4614-8970"))
@@ -31,8 +31,8 @@ LazyData: true
 Additional_repositories: https://bioconductor.org/packages/release/bioc
 Config/Needs/website: rmarkdown
 NeedsCompilation: no
-Packaged: 2026-03-15 05:35:35 UTC; pwwang
+Packaged: 2026-04-28 05:00:43 UTC; pwwang
 Author: Panwen Wang [aut, cre] (ORCID: <https://orcid.org/0000-0002-4614-8970>)
 Maintainer: Panwen Wang <pwwang@pwwang.com>
 Repository: CRAN
-Date/Publication: 2026-03-15 06:00:02 UTC
+Date/Publication: 2026-04-28 08:20:02 UTC

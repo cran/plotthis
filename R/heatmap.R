@@ -147,6 +147,7 @@ process_heatmap_data <- function(
     if (identical(rows_by, columns_by) && !is.null(rows_by)) {
         stop("[Heatmap] 'rows_by' and 'columns_by' can not be the same.")
     }
+    stopifnot("[Heatmap] no data is presented (nrow == 0)." = nrow(data) > 0)
     # Infer in_form
     if (in_form == "auto") {
         if (is.matrix(data)) {
@@ -973,18 +974,14 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #' @param lower_quantile,upper_quantile,lower_cutoff,upper_cutoff Vector of minimum and maximum cutoff values or quantile values for each feature.
 #'  It's applied to aggregated values when aggregated values are used (e.g. plot_type tile, label, etc).
 #'  It's applied to raw values when raw values are used (e.g. plot_type bars, etc).
-#' @param rows_palette A character string specifying the palette of the row group annotation.
-#'  The default is "Paired".
-#' @param rows_palcolor A character vector of colors to override the palette of the row group annotation.
-#' @param columns_palette A character string specifying the palette of the column group annotation.
-#'  The default is "Paired".
-#' @param columns_palcolor A character vector of colors to override the palette of the column group annotation.
-#' @param columns_split_palette A character string specifying the palette of the column split annotation.
-#'  The default is "simspec".
-#' @param columns_split_palcolor A character vector of colors to override the palette of the column split annotation.
-#' @param rows_split_palette A character string specifying the palette of the row split annotation.
-#'  The default is "simspec".
-#' @param rows_split_palcolor A character vector of colors to override the palette of the row split annotation.
+#' @note Removed parameters: `rows_palette`, `rows_palcolor`, `columns_palette`, `columns_palcolor`,
+#'  `columns_split_palette`, `columns_split_palcolor`, `rows_split_palette`, `rows_split_palcolor` —
+#'  use `row_annotation_palette`/`row_annotation_palcolor` with key `.row` (alias for `rows_by`) or
+#'  `.rows.split` (alias for `rows_split_by`); similarly `column_annotation_palette`/
+#'  `column_annotation_palcolor` with `.col`/`.column` or `.col.split`/`.column.split`.
+#'  Also removed: `row_name_annotation`, `row_name_legend`, `column_name_annotation`, `column_name_legend` —
+#'  set `row_annotation_params$.row` to `FALSE` to disable the row name annotation; use `$show_legend`
+#'  inside the param entry to control legend visibility. Use `column_annotation_params$.col` similarly.
 #' @param cluster_columns A logical value indicating whether to cluster the columns.
 #'  If TRUE and columns_split_by is provided, the clustering will only be applied to the columns within the same split.
 #' @param cluster_rows A logical value indicating whether to cluster the rows.
@@ -1018,20 +1015,62 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #' @param pie_size A numeric value or a function specifying the size of the pie chart.
 #'  If it is a function, the function should take `count` as the argument and return the size.
 #' @param pie_size_name A character string specifying the name of the legend for the pie size.
-#' @param label_size A numeric value specifying the size of the labels when `cell_type = "label"`.
+#' @param label_size A numeric value specifying the default size (pt) of the labels when `cell_type = "label"`.
+#'  Used as fallback when the `label` function does not return a `size` field.
+#' @param label_color A character string specifying the default color of the labels when `cell_type = "label"`.
+#'  Used as fallback when the `label` function does not return a `color` field. Default is `"black"`.
+#' @param label_name A character string specifying the title of the label legend. Default is `"label"`.
+#'  The legend is shown automatically when the `label` function returns a list with a `legend` field for at least
+#'  one cell — no extra configuration needed. Set `legend.position = "none"` to suppress all legends.
+#' @param mark_size A numeric value specifying the default stroke width (lwd) of the marks when `cell_type = "mark"`.
+#'  Used as fallback when the `mark` function does not return a `size` field. Default is `1`.
+#' @param mark_color A character string specifying the default color of the marks when `cell_type = "mark"`.
+#'  Used as fallback when the `mark` function does not return a `color` field. Default is `"black"`.
+#' @param mark_name A character string specifying the title of the mark legend. Default is `"mark"`.
+#'  The legend is shown automatically when the `mark` function returns a list with a `legend` field.
+#' @param mark A function to calculate the marks drawn on top of heatmap cells when `cell_type = "mark"`.
+#'  Same dispatch rules as `label` (1, 3, or 5 arguments).
+#'  The function should return one of:
+#'  * `NA` — no mark is drawn for this cell.
+#'  * A character scalar — the mark type string; `mark_color` and `mark_size` are used for appearance.
+#'  * A named list with any of the following fields:
+#'    - `mark` (or first unnamed element): character scalar, the mark type string.
+#'    - `size`: numeric stroke width (lwd), overrides `mark_size`.
+#'    - `color`: character color string, overrides `mark_color`.
+#'    - `legend`: character string used as the legend entry key.
+#'    - `order`: integer controlling legend entry position (smaller = higher).
+#'  **Supported mark types:**
+#'  * Primitives: `-` (h-line), `|` (v-line), `+` (cross), `/` (l-diag), `\` (r-diag),
+#'    `x` (both diags), `o` (circle with gap), `()` (circle touching edge), `<>` (diamond).
+#'  * With rectangular border: `[]`, `[-]`, `[|]`, `[+]`, `[/]`, `[\]`, `[x]`, `[o]`, `[()]`, `[<>]`.
+#'  * With full circle: `(-)`, `(|)`, `(+)`, `(/)`, `(\)`, `(x)`, `(o)`, `(<>)`.
+#'  * With diamond: `<->`, `<|>`, `<+>`, `</>`, `<\>`, `<x>`, `<o>`.
+#'  * Octagon (standalone or wrapper): `{}`, `{-}`, `{|}`, `{+}`, `{/}`, `{\\}`, `{x}`, `{o}`, `{()}`, `{<>}`.
+#'  * Combinations: e.g. `[(|)]`, `[(-)]`, `[(+)]`, `[(/)]`, `[(\)]`, `[(x)]`, `[(o)]`, `[(<>)]`.
 #' @param label A function to calculate the labels for the heatmap cells.
-#' It can take either 1, 3, or 5 arguments. The first argument is the aggregated values.
-#' If it takes 3 arguments, the second and third arguments are the row and column indices.
-#' If it takes 5 arguments, the second and third arguments are the row and column indices,
-#' the fourth and fifth arguments are the row and column names.
-#' The function should return a character vector of the same length as the aggregated values.
-#' If the function returns NA, no label will be shown for that cell.
-#' For the indices, if you have the same dimension of data (same order of rows and columns) as the heatmap, you need to use `ComplexHeatmap::pindex()` to get the correct values.
+#'  It can take either 1, 3, or 5 arguments. The first argument is the aggregated value for a single cell.
+#'  If it takes 3 arguments, the second and third arguments are the row and column indices of that cell.
+#'  If it takes 5 arguments, the second and third arguments are the row and column indices,
+#'  and the fourth and fifth arguments are the row and column names.
+#'  The function should return one of:
+#'  * `NA` — no label is drawn for this cell.
+#'  * A character scalar — used as the label text; `label_size` and `label_color` are used for size and color.
+#'  * A named list with any of the following fields:
+#'    - `label`: character scalar for the label text.
+#'    - `size`: numeric pt size (overrides `label_size`).
+#'    - `color`: character color string (overrides `label_color`).
+#'    - `legend`: character string used as the legend entry for this cell's color/label combination.
+#'    - `order`: integer controlling the position of this legend entry — smaller values appear first (top) in the legend.
+#'      Entries without an `order` are appended after all explicitly ordered entries.
+#'  For the indices, if you have the same dimension of data (same order of rows and columns) as the heatmap, you need to use `ComplexHeatmap::pindex()` to get the correct values.
 #' @param layer_fun_callback A function to add additional layers to the heatmap.
 #'  The function should have the following arguments: `j`, `i`, `x`, `y`, `w`, `h`, `fill`, `sr` and `sc`.
 #'  Please also refer to the `layer_fun` argument in `ComplexHeatmap::Heatmap`.
 #' @param cell_type A character string specifying the type of the heatmap cells.
-#'  The default is values. Other options are "bars", "label", "dot", "violin", "boxplot".
+#'  The default is "tile" Other options are "bars", "label", "mark", "label+mark" (or equivalently "mark+label"),
+#'  "dot", "violin", "boxplot" and "pie".
+#'  Use "label+mark" to render both marks (drawn first, as background) and text labels (drawn on top)
+#'  in each cell simultaneously, combining all `label_*` and `mark_*` parameters.
 #'  Note that for pie chart, the values under columns specified by `rows` will not be used directly. Instead, the values
 #'  will just be counted in different `pie_group_by` groups. `NA` values will not be counted.
 #' @param cell_agg A function to aggregate the values in the cell, for the cell type "tile" and "label".
@@ -1047,9 +1086,6 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #'  from the values in the cell or a function to calculate the size from the values in the cell.
 #' @param dot_size_name A character string specifying the name of the legend for the dot size.
 #' If NULL, the dot size legend will not be shown.
-#' @param column_name_annotation A logical value indicating whether to add the column annotation for the column names.
-#'  which is a simple annotaion indicating the column names.
-#' @param column_name_legend A logical value indicating whether to show the legend of the column name annotation.
 #' @param column_annotation A character string/vector of the column name(s) to use as the column annotation.
 #'  Or a list with the keys as the names of the annotation and the values as the column names.
 #' @param column_annotation_side A character string specifying the side of the column annotation.
@@ -1064,12 +1100,12 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #'  Could be a list with the keys as the names of the annotation and the values as the types.
 #'  If the type is "auto", the type will be determined by the type and number of the column data.
 #' @param column_annotation_params A list of parameters passed to the annotation function.
-#'  Could be a list with the keys as the names of the annotation and the values as the parameters passed to the annotation function. For the parameters for names (columns_by, rows_by, columns_split_by, rows_split_by), the key should be "name.(name)", where `(name)` is the name of the annotation.
+#'  Could be a list with the keys as the names of the annotation and the values as the parameters.
+#'  For the name/split annotations, use aliases: `.col`/`.cols`/`.column`/`.columns` for `columns_by`, `.col.split`/`.cols.split`/`.column.split`/`.columns.split`
+#'  for `columns_split_by`. Setting a key to `FALSE` disables that annotation.
+#'  `$<key>$show_legend` controls the legend for that annotation.
 #'  See [anno_pie()], [anno_ring()], [anno_bar()], [anno_violin()], [anno_boxplot()], [anno_density()], [anno_simple()], [anno_points()] and [anno_lines()] for the parameters of each annotation function.
 #' @param column_annotation_agg A function to aggregate the values in the column annotation.
-#' @param row_name_annotation A logical value indicating whether to add the row annotation for the row names.
-#'  which is a simple annotaion indicating the row names.
-#' @param row_name_legend A logical value indicating whether to show the legend of the row name annotation.
 #' @param row_annotation A character string/vector of the column name(s) to use as the row annotation.
 #' Or a list with the keys as the names of the annotation and the values as the column names.
 #' @param row_annotation_side A character string specifying the side of the row annotation.
@@ -1084,8 +1120,10 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #' Could be a list with the keys as the names of the annotation and the values as the types.
 #' If the type is "auto", the type will be determined by the type and number of the row data.
 #' @param row_annotation_params A list of parameters passed to the annotation function.
-#' Could be a list with the keys as the names of the annotation and the values as the parameters.
-#' Same as `column_annotation_params`.
+#'  Could be a list with the keys as the names of the annotation and the values as the parameters.
+#'  For the name/split annotations, use aliases: `.row`/`.rows` for `rows_by`, `.rows.split`/`.row.split` for `rows_split_by`.
+#'  Setting a key to `FALSE` disables that annotation. `$<key>$show_legend` controls the legend.
+#'  Same structure as `column_annotation_params`.
 #' @param row_annotation_agg A function to aggregate the values in the row annotation.
 #' @param add_reticle A logical value indicating whether to add a reticle to the heatmap.
 #' @param reticle_color A character string specifying the color of the reticle.
@@ -1103,6 +1141,24 @@ layer_boxviolin <- function(j, i, x, y, w, h, fill, flip, data, colors, fn) {
 #' When 3 elements are provided, the first one will be used for top, the second one will be used for left and right, and the third one will be used for bottom.
 #' When 4 elements are provided, they will be used for top, right, bottom, and left respectively.
 #' If no unit is provided, the default unit will be "mm".
+#' @param base_size A positive numeric scalar used as a scaling factor for the overall heatmap size.
+#' Default is `1` (no scaling). Values greater than 1 enlarge the heatmap; values less than 1 shrink it.
+#' Internally, all calculated cell dimensions are multiplied by this factor.
+#' @param aspect.ratio A positive numeric scalar giving the height-to-width ratio of a single heatmap
+#' cell. When `NULL` (default), sensible per-`cell_type` defaults are used:
+#' * `tile`, `label`, `dot`: square cells (ratio = 1).
+#' * `bars`: wider-than-tall cells (ratio = 0.5) so individual bars are legible.
+#' * `violin`, `boxplot`, `pie`: square cells with a larger base size (0.5 in) so embedded
+#'   sub-plots have enough room.
+#' Provide an explicit value to override these defaults (e.g. `aspect.ratio = 2` for
+#' portrait cells, `aspect.ratio = 0.5` for landscape cells).
+#' Note that for `cell_type = "pie"` the cells are always drawn square by ComplexHeatmap
+#' regardless of this setting; use it primarily to budget the figure size.
+#' Note that the aspect ratio is not guaranteed to be perfectly preserved; it will also be restricted by the size and height/width ratio of the entire plot itself.
+#' @param draw_opts A named list of additional arguments passed to [ComplexHeatmap::draw()]. Arguments already managed
+#' internally (`annotation_legend_list`, `padding`, `show_annotation_legend`, `annotation_legend_side`,
+#' `column_title`) take precedence over any values supplied here.
+#' See <https://jokergoo.github.io/ComplexHeatmap/reference/draw-HeatmapList-method.html> for available options.
 #' @param ... Other arguments passed to [ComplexHeatmap::Heatmap()]
 #' When `row_names_max_width` is passed, a unit is expected. But you can also pass a numeric values,
 #' with a default unit "inches", or a string like "5inches" to specify the number and unit directly.
@@ -1122,15 +1178,15 @@ HeatmapAtomic <- function(
     columns_by = NULL, columns_split_by = NULL,
     # palettes
     palette = "RdBu", palcolor = NULL,
-    rows_palette = "Paired", rows_palcolor = NULL, rows_split_palette = "simspec", rows_split_palcolor = NULL,
-    columns_palette = "Paired", columns_palcolor = NULL, columns_split_palette = "simspec", columns_split_palcolor = NULL,
     # cell_type: pies
     pie_size_name = "size", pie_size = NULL, pie_values = "length",
     pie_group_by = NULL, pie_palette = "Spectral", pie_palcolor = NULL,
     # cell_type: bars
     bars_sample = 100,
     # cell_type: label
-    label = identity, label_size = 10,
+    label = scales::label_number_auto(), label_size = 10, label_color = "black", label_name = "label",
+    # cell_type: mark
+    mark = identity, mark_color = "black", mark_size = 1, mark_name = "mark",
     # cell_type: violin
     violin_fill = NULL,
     # cell_type: boxplot
@@ -1147,9 +1203,7 @@ HeatmapAtomic <- function(
     # reticle
     add_reticle = FALSE, reticle_color = "grey",
     # passed to ComplexHeatmap::Heatmap
-    column_name_annotation = TRUE, column_name_legend = NULL,
-    row_name_annotation = TRUE, row_name_legend = NULL,
-    cluster_columns = TRUE, cluster_rows = TRUE, show_row_names = !row_name_annotation, show_column_names = !column_name_annotation,
+    cluster_columns = TRUE, cluster_rows = TRUE, show_row_names = NULL, show_column_names = NULL,
     border = TRUE, title = NULL, column_title = character(0), row_title = character(0), na_col = "grey85",
     row_names_side = "right", column_names_side = "bottom",
     column_annotation = NULL, column_annotation_side = "top", column_annotation_palette = "Paired", column_annotation_palcolor = NULL,
@@ -1157,12 +1211,63 @@ HeatmapAtomic <- function(
     row_annotation = NULL, row_annotation_side = "left", row_annotation_palette = "Paired", row_annotation_palcolor = NULL,
     row_annotation_type = "auto", row_annotation_params = list(), row_annotation_agg = NULL,
     # misc
-    flip = FALSE, alpha = 1, seed = 8525, return_grob = FALSE, padding = 15,
+    flip = FALSE, alpha = 1, seed = 8525, return_grob = FALSE, padding = 15, base_size = 1, aspect.ratio = NULL, draw_opts = list(),
     # cell customization
     layer_fun_callback = NULL, cell_type = "tile", cell_agg = NULL,
     ...
 ) {
     # Data was validated in `plotthis::Heatmap()`
+
+    # Resolve annotation aliases:
+    #   .row         -> rows_by
+    #   .rows.split  -> rows_split_by
+    #   .col/.column -> columns_by
+    #   .col.split/.column.split -> columns_split_by
+    resolve_anno_aliases <- function(lst, row_key, rsplit_key, col_key, csplit_key) {
+        if (is.null(lst) || !is.list(lst)) return(lst)
+        alias_map <- list(
+            ".row"           = row_key,
+            ".rows"          = row_key,
+            ".rows.split"    = rsplit_key,
+            ".row.split"     = rsplit_key,
+            ".col"           = col_key,
+            ".cols"          = col_key,
+            ".column"        = col_key,
+            ".columns"       = col_key,
+            ".col.split"     = csplit_key,
+            ".cols.split"    = csplit_key,
+            ".column.split"  = csplit_key,
+            ".columns.split" = csplit_key
+        )
+        for (alias in names(alias_map)) {
+            real <- alias_map[[alias]]
+            if (!is.null(real) && alias %in% names(lst) && !real %in% names(lst)) {
+                lst[[real]] <- lst[[alias]]
+                lst[[alias]] <- NULL
+            } else if (!is.null(real) && alias %in% names(lst)) {
+                lst[[alias]] <- NULL  # real key wins; drop alias
+            }
+        }
+        lst
+    }
+
+    row_annotation_params  <- resolve_anno_aliases(row_annotation_params,    rows_by, rows_split_by, columns_by, columns_split_by)
+    row_annotation_palette <- resolve_anno_aliases(row_annotation_palette,   rows_by, rows_split_by, columns_by, columns_split_by)
+    row_annotation_palcolor <- resolve_anno_aliases(row_annotation_palcolor, rows_by, rows_split_by, columns_by, columns_split_by)
+    row_annotation_type    <- resolve_anno_aliases(row_annotation_type,      rows_by, rows_split_by, columns_by, columns_split_by)
+    row_annotation_agg     <- resolve_anno_aliases(row_annotation_agg,       rows_by, rows_split_by, columns_by, columns_split_by)
+
+    column_annotation_params  <- resolve_anno_aliases(column_annotation_params,    rows_by, rows_split_by, columns_by, columns_split_by)
+    column_annotation_palette <- resolve_anno_aliases(column_annotation_palette,   rows_by, rows_split_by, columns_by, columns_split_by)
+    column_annotation_palcolor <- resolve_anno_aliases(column_annotation_palcolor, rows_by, rows_split_by, columns_by, columns_split_by)
+    column_annotation_type    <- resolve_anno_aliases(column_annotation_type,      rows_by, rows_split_by, columns_by, columns_split_by)
+    column_annotation_agg     <- resolve_anno_aliases(column_annotation_agg,       rows_by, rows_split_by, columns_by, columns_split_by)
+
+    # Determine whether the name annotations are enabled (FALSE param key disables them)
+    row_name_anno_enabled <- is.null(rows_by) || !isFALSE(row_annotation_params[[rows_by]] %||% TRUE)
+    col_name_anno_enabled <- is.null(columns_by) || !isFALSE(column_annotation_params[[columns_by]] %||% TRUE)
+    show_row_names    <- show_row_names    %||% !row_name_anno_enabled
+    show_column_names <- show_column_names %||% !col_name_anno_enabled
 
     # Convert to the format that ComplexHeatmap::Heatmap can understand
     if (isFALSE(column_title)) column_title <- NULL
@@ -1363,7 +1468,6 @@ HeatmapAtomic <- function(
         }
     }
 
-    nrow_multiplier <- ncol_multiplier <- 1
     if (cell_type == "pie") {
         if (is.null(pie_group_by)) {
             stop("[Heatmap] Please provide 'pie_group_by' to use 'cell_type = 'pie'.")
@@ -1442,8 +1546,6 @@ HeatmapAtomic <- function(
                 border = TRUE, labels = pie_group_levels, legend_gp = gpar(fill = pie_colors)
             )
         }
-        nrow_multiplier <- 4
-        ncol_multiplier <- 6
     }
     else if (cell_type == "bars") {
         if (isTRUE(add_bg)) {
@@ -1472,7 +1574,6 @@ HeatmapAtomic <- function(
         }
         # Override the main legend
         legends$.heatmap <- get_main_legend(FALSE)
-        nrow_multiplier <- 0.5
     }
     else if (cell_type == "dot") {
         if (is.character(dot_size)) {
@@ -1649,29 +1750,100 @@ HeatmapAtomic <- function(
         if (isTRUE(add_reticle)) {
             stop("[Heatmap] Cannot use 'add_reticle' with 'cell_type = 'tile'.")
         }
-        hmargs$layer_fun <- function(j, i, x, y, w, h, fill, sr, sc) {
-            labels <- ComplexHeatmap::pindex(hmargs$matrix, i, j)
-            if (is.function(label)) {
-                nargs <- length(formalArgs(label))
-                if (nargs == 1) {
-                    labels <- label(labels)
-                } else if (nargs == 3) {
-                    labels <- label(labels, i, j)
-                } else if (nargs == 5) {
-                    labels <- label(labels, i, j, rownames(hmargs$matrix)[i], colnames(hmargs$matrix)[j])
-                } else {
-                    stop("[Heatmap] 'label' function should take 1, 3 or 5 arguments.")
+        # Helper: call label() for a single cell value, dispatching by nargs
+        .call_label <- if (is.function(label)) {
+            nargs_label <- length(formalArgs(label))
+            rnames <- rownames(hmargs$matrix)
+            cnames <- colnames(hmargs$matrix)
+            if (nargs_label == 1 || is.primitive(label)) {
+                function(val, ri, ci) label(val)
+            } else if (nargs_label == 3) {
+                function(val, ri, ci) label(val, ri, ci)
+            } else if (nargs_label == 5) {
+                function(val, ri, ci) label(val, ri, ci, rnames[ri], cnames[ci])
+            } else {
+                stop("[Heatmap] 'label' function should take 1, 3 or 5 arguments.")
+            }
+        } else {
+            function(val, ri, ci) val
+        }
+
+        # Helper: extract label text, supporting unnamed first list element
+        .extract_lbl <- function(r) {
+            if (!is.list(r)) return(if (length(r) == 1 && is.na(r)) NA_character_ else as.character(r))
+            if (!is.null(r$label)) return(as.character(r$label))
+            nms <- names(r)
+            unnamed_idx <- which(is.null(nms) | nms == "")
+            if (length(unnamed_idx) > 0) return(as.character(r[[unnamed_idx[1]]]))
+            NA_character_
+        }
+
+        # Pre-compute over whole matrix to auto-detect legend entries
+        if (!identical(legend.position, "none")) {
+            lgnd_seen <- list()  # named list: legend_key -> list(text, color)
+            for (ri in seq_len(nrow(hmargs$matrix))) {
+                for (ci in seq_len(ncol(hmargs$matrix))) {
+                    r <- .call_label(hmargs$matrix[ri, ci], ri, ci)
+                    if (is.list(r) && !is.null(r$legend) && !is.na(r$legend)) {
+                        key <- r$legend
+                        if (is.null(lgnd_seen[[key]])) {
+                            lbl_txt <- .extract_lbl(r)
+                            lgnd_seen[[key]] <- list(
+                                text  = if (!is.na(lbl_txt)) lbl_txt else key,
+                                color = r$color %||% label_color,
+                                order = r$order %||% NA_integer_
+                            )
+                        }
+                    }
                 }
             }
-            inds <- !is.na(labels)
-            if (any(inds)) {
-                theta <- seq(pi / 8, 2 * pi, length.out = 16)
-                lapply(theta, function(a) {
-                    x_out <- x[inds] + unit(cos(a) * label_size / 30, "mm")
-                    y_out <- y[inds] + unit(sin(a) * label_size / 30, "mm")
-                    grid.text(labels[inds], x = x_out, y = y_out, gp = gpar(fontsize = label_size, col = "white"))
+
+            if (length(lgnd_seen) > 0) {
+                # Sort by order field if any entries carry it
+                orders <- sapply(lgnd_seen, function(e) e$order %||% NA_integer_)
+                if (!all(is.na(orders))) {
+                    # Entries without order are placed after explicitly ordered ones
+                    orders[is.na(orders)] <- max(orders, na.rm = TRUE) + seq_len(sum(is.na(orders)))
+                    lgnd_seen <- lgnd_seen[order(orders)]
+                }
+                lgnd_graphics <- lapply(lgnd_seen, function(entry) {
+                    txt <- entry$text
+                    col <- entry$color
+                    sz  <- label_size
+                    function(x, y, w, h, fill) {
+                        grid.text(txt, x, y, gp = gpar(fontsize = sz, col = col, fontface = "bold"))
+                    }
                 })
-                grid.text(labels[inds], x[inds], y[inds], gp = gpar(fontsize = label_size, col = "black"))
+                legends$.label <- ComplexHeatmap::Legend(
+                    title    = label_name,
+                    labels   = names(lgnd_seen),
+                    graphics = lgnd_graphics,
+                    direction = legend.direction
+                )
+            }
+        }
+
+        hmargs$layer_fun <- function(j, i, x, y, w, h, fill, sr, sc) {
+            raw_vals <- ComplexHeatmap::pindex(hmargs$matrix, i, j)
+            results <- lapply(seq_along(i), function(k) .call_label(raw_vals[k], i[k], j[k]))
+
+            lbl   <- sapply(results, .extract_lbl)
+            sizes  <- sapply(results, function(r) if (is.list(r)) r$size  %||% label_size else label_size)
+            colors <- sapply(results, function(r) if (is.list(r)) r$color %||% label_color else label_color)
+
+            inds <- which(!is.na(lbl))
+            if (length(inds) > 0) {
+                theta <- seq(pi / 8, 2 * pi, length.out = 16)
+                for (k in inds) {
+                    sz <- sizes[k]
+                    lapply(theta, function(a) {
+                        grid.text(lbl[k],
+                            x = x[k] + unit(cos(a) * sz / 30, "mm"),
+                            y = y[k] + unit(sin(a) * sz / 30, "mm"),
+                            gp = gpar(fontsize = sz, col = "white"))
+                    })
+                    grid.text(lbl[k], x[k], y[k], gp = gpar(fontsize = sz, col = colors[k]))
+                }
             }
             if (is.function(layer_fun_callback)) {
                 layer_fun_callback(j, i, x, y, w, h, fill, sr, sc)
@@ -1679,77 +1851,704 @@ HeatmapAtomic <- function(
         }
         legends$.heatmap <- get_main_legend()
     }
+    else if (cell_type == "mark") {
+        if (isTRUE(add_bg)) {
+            stop("[Heatmap] Cannot use 'add_bg' with 'cell_type = 'mark'.")
+        }
+        if (isTRUE(add_reticle)) {
+            stop("[Heatmap] Cannot use 'add_reticle' with 'cell_type = 'mark'.")
+        }
 
-    .ncols <- nlevels(data[[columns_by]])
-    if (!is.null(columns_split_by)) {
-        .ncols <- .ncols * nlevels(data[[columns_split_by]])
+        # ── Mark dispatch helper ─────────────────────────────────────────────
+        .call_mark <- if (is.function(mark)) {
+            nargs_mark <- length(formalArgs(mark))
+            rnames <- rownames(hmargs$matrix)
+            cnames <- colnames(hmargs$matrix)
+            if (nargs_mark == 1 || is.primitive(mark)) {
+                function(val, ri, ci) mark(val)
+            } else if (nargs_mark == 3) {
+                function(val, ri, ci) mark(val, ri, ci)
+            } else if (nargs_mark == 5) {
+                function(val, ri, ci) mark(val, ri, ci, rnames[ri], cnames[ci])
+            } else {
+                stop("[Heatmap] 'mark' function should take 1, 3 or 5 arguments.")
+            }
+        } else {
+            function(val, ri, ci) val
+        }
+
+        # ── Extract mark type string ────────────────────────────────────────
+        .extract_mark <- function(r) {
+            if (!is.list(r)) return(if (length(r) == 1 && is.na(r)) NA_character_ else as.character(r))
+            if (!is.null(r$mark)) return(as.character(r$mark))
+            nms <- names(r)
+            unnamed_idx <- which(is.null(nms) | nms == "")
+            if (length(unnamed_idx) > 0) return(as.character(r[[unnamed_idx[1]]]))
+            NA_character_
+        }
+
+        # ── Mark type parser ────────────────────────────────────────────────
+        # Parses a mark string into a vector of drawing primitives.
+        # Outer wrappers: [] adds "rect", () adds "circle_full", <> adds "diamond".
+        # Wrappers are stripped left-to-right; the remainder is an inner primitive.
+        # Inner primitives: -, |, +, /, \, x, o, (), <>
+        .parse_mark_type <- function(m) {
+            if (is.na(m) || m == "" || m == "NA") return(character(0))
+            prims <- character(0)
+            repeat {
+                if (nchar(m) >= 2 && startsWith(m, "[") && endsWith(m, "]")) {
+                    prims <- c(prims, "rect")
+                    m <- substr(m, 2L, nchar(m) - 1L)
+                } else if (nchar(m) >= 3 && startsWith(m, "(") && endsWith(m, ")")) {
+                    # "(-)" wrapper, but "()" alone is a primitive — handled below
+                    prims <- c(prims, "circle_full")
+                    m <- substr(m, 2L, nchar(m) - 1L)
+                } else if (nchar(m) >= 3 && startsWith(m, "<") && endsWith(m, ">")) {
+                    # "<->" wrapper, but "<>" alone is a primitive — handled below
+                    prims <- c(prims, "diamond")
+                    m <- substr(m, 2L, nchar(m) - 1L)
+                } else if (nchar(m) >= 3 && startsWith(m, "{") && endsWith(m, "}")) {
+                    # "{-}" wrapper, but "{}" alone is a primitive — handled below
+                    prims <- c(prims, "octagon")
+                    m <- substr(m, 2L, nchar(m) - 1L)
+                } else {
+                    break
+                }
+            }
+            inner <- if (m == "") {
+                character(0)
+            } else {
+                switch(m,
+                    "-"  = "hline",
+                    "|"  = "vline",
+                    "+"  = c("hline", "vline"),
+                    "/"  = "ldiag",
+                    "\\" = "rdiag",
+                    "x"  = c("ldiag", "rdiag"),
+                    "o"  = "circle_gap",
+                    "()" = "circle_full",
+                    "<>" = "diamond",
+                    "{}" = "octagon",
+                    stop(paste0("[Heatmap] Unknown mark type: '", m, "'"))
+                )
+            }
+            c(prims, inner)
+        }
+
+        # ── Vectorized primitive renderer ───────────────────────────────────
+        # Draws one primitive for a batch of cells (same mark type, different positions).
+        .draw_mark_prim <- function(prim, xv, yv, wv, hv, col, lwd) {
+            switch(prim,
+                rect = grid::grid.rect(
+                    x = xv, y = yv, width = wv, height = hv,
+                    gp = gpar(col = col, fill = NA, lwd = lwd)),
+
+                hline = grid::grid.segments(
+                    x0 = xv - wv * 0.5, y0 = yv,
+                    x1 = xv + wv * 0.5, y1 = yv,
+                    gp = gpar(col = col, lwd = lwd)),
+
+                vline = grid::grid.segments(
+                    x0 = xv, y0 = yv - hv * 0.5,
+                    x1 = xv, y1 = yv + hv * 0.5,
+                    gp = gpar(col = col, lwd = lwd)),
+
+                ldiag = grid::grid.segments(
+                    x0 = xv - wv * 0.5, y0 = yv - hv * 0.5,
+                    x1 = xv + wv * 0.5, y1 = yv + hv * 0.5,
+                    gp = gpar(col = col, lwd = lwd)),
+
+                rdiag = grid::grid.segments(
+                    x0 = xv - wv * 0.5, y0 = yv + hv * 0.5,
+                    x1 = xv + wv * 0.5, y1 = yv - hv * 0.5,
+                    gp = gpar(col = col, lwd = lwd)),
+
+                # circle: diameter = 3/4 of the shorter physical edge, true circle
+                # Use mm so the radius is invariant to viewport aspect ratio
+                circle_gap = {
+                    .r_mm <- min(
+                        convertUnit(wv[1L], "mm", valueOnly = TRUE),
+                        convertUnit(hv[1L], "mm", valueOnly = TRUE)
+                    ) * 0.25
+                    grid::grid.circle(
+                        x = xv, y = yv,
+                        r = unit(.r_mm, "mm"),
+                        gp = gpar(col = col, fill = NA, lwd = lwd))
+                },
+
+                # ellipse touching all 4 cell edges (no gap), handles non-square cells
+                circle_full = {
+                    .theta  <- seq(0, 2 * pi, length.out = 65L)[seq_len(64L)]
+                    .cos_t  <- cos(.theta)
+                    .sin_t  <- sin(.theta)
+                    for (k in seq_along(xv)) {
+                        grid::grid.polygon(
+                            x = xv[k] + wv[k] * 0.5 * .cos_t,
+                            y = yv[k] + hv[k] * 0.5 * .sin_t,
+                            gp = gpar(
+                                col  = if (length(col) == 1L) col else col[k],
+                                fill = NA,
+                                lwd  = if (length(lwd) == 1L) lwd else lwd[k]))
+                    }
+                },
+
+                # diamond — loop per cell (grid.polygon id approach avoids this)
+                diamond = {
+                    n <- length(xv)
+                    hw <- wv * 0.5; hh <- hv * 0.5
+                    for (k in seq_len(n)) {
+                        grid::grid.polygon(
+                            x = grid::unit.c(xv[k], xv[k] + hw[k], xv[k], xv[k] - hw[k]),
+                            y = grid::unit.c(yv[k] + hh[k], yv[k], yv[k] - hh[k], yv[k]),
+                            gp = gpar(col = col[k], fill = NA, lwd = lwd[k]))
+                    }
+                },
+
+                # octagon: 4 sides on the cell edges, 4 small corner cuts (cut factor = 0.2)
+                # The corner cuts are closer to the actual corners than a regular octagon would be
+                octagon = {
+                    n  <- length(xv)
+                    hw <- wv * 0.5; hh <- hv * 0.5
+                    f  <- 0.2  # corner cut factor (0 = full rectangle, 0.5 = diamond)
+                    for (k in seq_len(n)) {
+                        cx <- xv[k]; cy <- yv[k]
+                        dx <- hw[k] * f; dy <- hh[k] * f
+                        grid::grid.polygon(
+                            x = grid::unit.c(
+                                cx - hw[k] + dx, cx + hw[k] - dx,  # top edge: left → right
+                                cx + hw[k],       cx + hw[k],       # right edge: top → bottom
+                                cx + hw[k] - dx, cx - hw[k] + dx,  # bottom edge: right → left
+                                cx - hw[k],       cx - hw[k]        # left edge: bottom → top
+                            ),
+                            y = grid::unit.c(
+                                cy + hh[k],       cy + hh[k],       # top edge
+                                cy + hh[k] - dy,  cy - hh[k] + dy,  # right edge
+                                cy - hh[k],       cy - hh[k],       # bottom edge
+                                cy - hh[k] + dy,  cy + hh[k] - dy   # left edge
+                            ),
+                            gp = gpar(col = col[k], fill = NA, lwd = lwd[k]))
+                    }
+                }
+            )
+        }
+
+        # ── Legend icon builder ─────────────────────────────────────────────
+        # Returns a function(x, y, w, h, fill) that draws the mark in a legend key.
+        .mark_legend_icon <- function(mark_str, col, lwd) {
+            prims <- .parse_mark_type(mark_str)
+            function(x, y, w, h, fill) {
+                for (p in prims) {
+                    .draw_mark_prim(p, x, y, w, h, col, lwd)
+                }
+            }
+        }
+
+        # ── Pre-scan for legend entries ─────────────────────────────────────
+        if (!identical(legend.position, "none")) {
+            mkl_seen <- list()
+            for (ri in seq_len(nrow(hmargs$matrix))) {
+                for (ci in seq_len(ncol(hmargs$matrix))) {
+                    r <- .call_mark(hmargs$matrix[ri, ci], ri, ci)
+                    if (is.list(r) && !is.null(r$legend) && !is.na(r$legend)) {
+                        key <- r$legend
+                        if (is.null(mkl_seen[[key]])) {
+                            mk_str <- .extract_mark(r)
+                            mkl_seen[[key]] <- list(
+                                mark  = if (!is.na(mk_str)) mk_str else key,
+                                color = r$color %||% mark_color,
+                                size  = r$size  %||% mark_size,
+                                order = r$order %||% NA_integer_
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (length(mkl_seen) > 0) {
+                # Sort by order
+                orders <- sapply(mkl_seen, function(e) e$order %||% NA_integer_)
+                if (!all(is.na(orders))) {
+                    orders[is.na(orders)] <- max(orders, na.rm = TRUE) + seq_len(sum(is.na(orders)))
+                    mkl_seen <- mkl_seen[order(orders)]
+                }
+                mkl_graphics <- lapply(mkl_seen, function(entry) {
+                    .mark_legend_icon(entry$mark, entry$color, entry$size)
+                })
+                legends$.mark <- ComplexHeatmap::Legend(
+                    title       = mark_name,
+                    labels      = names(mkl_seen),
+                    graphics    = mkl_graphics,
+                    direction   = legend.direction,
+                    row_gap     = unit(1, "mm")
+                )
+            }
+        }
+
+        # ── layer_fun ───────────────────────────────────────────────────────
+        hmargs$layer_fun <- function(j, i, x, y, w, h, fill, sr, sc) {
+            raw_vals <- ComplexHeatmap::pindex(hmargs$matrix, i, j)
+            results  <- lapply(seq_along(i), function(k) .call_mark(raw_vals[k], i[k], j[k]))
+
+            marks_vec  <- sapply(results, .extract_mark)
+            colors_vec <- sapply(results, function(r) if (is.list(r)) r$color %||% mark_color else mark_color)
+            sizes_vec  <- sapply(results, function(r) if (is.list(r)) r$size  %||% mark_size  else mark_size)
+
+            # Draw each unique mark type as a batch
+            unique_marks <- unique(marks_vec[!is.na(marks_vec)])
+            for (mk in unique_marks) {
+                km   <- which(marks_vec == mk)
+                prms <- .parse_mark_type(mk)
+                for (prim in prms) {
+                    .draw_mark_prim(prim, x[km], y[km], w[km], h[km], colors_vec[km], sizes_vec[km])
+                }
+            }
+
+            if (is.function(layer_fun_callback)) {
+                layer_fun_callback(j, i, x, y, w, h, fill, sr, sc)
+            }
+        }
+        legends$.heatmap <- get_main_legend()
     }
-    .ncols <- .ncols * ncol_multiplier
-    .nrows <- nlevels(data[[rows_by]])
-    if (!is.null(rows_split_by)) {
-        .nrows <- .nrows * nlevels(data[[rows_split_by]])
+    else if (cell_type == "label+mark") {
+        if (isTRUE(add_bg)) {
+            stop("[Heatmap] Cannot use 'add_bg' with 'cell_type = \"label+mark\"'.")
+        }
+        if (isTRUE(add_reticle)) {
+            stop("[Heatmap] Cannot use 'add_reticle' with 'cell_type = \"label+mark\"'.")
+        }
+        # ── Label dispatch helper ────────────────────────────────────────────
+        .call_label <- if (is.function(label)) {
+            nargs_label <- length(formalArgs(label))
+            rnames <- rownames(hmargs$matrix)
+            cnames <- colnames(hmargs$matrix)
+            if (nargs_label == 1 || is.primitive(label)) {
+                function(val, ri, ci) label(val)
+            } else if (nargs_label == 3) {
+                function(val, ri, ci) label(val, ri, ci)
+            } else if (nargs_label == 5) {
+                function(val, ri, ci) label(val, ri, ci, rnames[ri], cnames[ci])
+            } else {
+                stop("[Heatmap] 'label' function should take 1, 3 or 5 arguments.")
+            }
+        } else {
+            function(val, ri, ci) val
+        }
+
+        # Helper: extract label text, supporting unnamed first list element
+        .extract_lbl <- function(r) {
+            if (!is.list(r)) return(if (length(r) == 1 && is.na(r)) NA_character_ else as.character(r))
+            if (!is.null(r$label)) return(as.character(r$label))
+            nms <- names(r)
+            unnamed_idx <- which(is.null(nms) | nms == "")
+            if (length(unnamed_idx) > 0) return(as.character(r[[unnamed_idx[1]]]))
+            NA_character_
+        }
+
+        # ── Mark dispatch helper ─────────────────────────────────────────────
+        .call_mark <- if (is.function(mark)) {
+            nargs_mark <- length(formalArgs(mark))
+            rnames <- rownames(hmargs$matrix)
+            cnames <- colnames(hmargs$matrix)
+            if (nargs_mark == 1 || is.primitive(mark)) {
+                function(val, ri, ci) mark(val)
+            } else if (nargs_mark == 3) {
+                function(val, ri, ci) mark(val, ri, ci)
+            } else if (nargs_mark == 5) {
+                function(val, ri, ci) mark(val, ri, ci, rnames[ri], cnames[ci])
+            } else {
+                stop("[Heatmap] 'mark' function should take 1, 3 or 5 arguments.")
+            }
+        } else {
+            function(val, ri, ci) val
+        }
+
+        # ── Extract mark type string ────────────────────────────────────────
+        .extract_mark <- function(r) {
+            if (!is.list(r)) return(if (length(r) == 1 && is.na(r)) NA_character_ else as.character(r))
+            if (!is.null(r$mark)) return(as.character(r$mark))
+            nms <- names(r)
+            unnamed_idx <- which(is.null(nms) | nms == "")
+            if (length(unnamed_idx) > 0) return(as.character(r[[unnamed_idx[1]]]))
+            NA_character_
+        }
+
+        # ── Mark type parser ────────────────────────────────────────────────
+        .parse_mark_type <- function(m) {
+            if (is.na(m) || m == "" || m == "NA") return(character(0))
+            prims <- character(0)
+            repeat {
+                if (nchar(m) >= 2 && startsWith(m, "[") && endsWith(m, "]")) {
+                    prims <- c(prims, "rect")
+                    m <- substr(m, 2L, nchar(m) - 1L)
+                } else if (nchar(m) >= 3 && startsWith(m, "(") && endsWith(m, ")")) {
+                    prims <- c(prims, "circle_full")
+                    m <- substr(m, 2L, nchar(m) - 1L)
+                } else if (nchar(m) >= 3 && startsWith(m, "<") && endsWith(m, ">")) {
+                    prims <- c(prims, "diamond")
+                    m <- substr(m, 2L, nchar(m) - 1L)
+                } else if (nchar(m) >= 3 && startsWith(m, "{") && endsWith(m, "}")) {
+                    # "{-}" wrapper, but "{}" alone is a primitive — handled below
+                    prims <- c(prims, "octagon")
+                    m <- substr(m, 2L, nchar(m) - 1L)
+                } else {
+                    break
+                }
+            }
+            inner <- if (m == "") {
+                character(0)
+            } else {
+                switch(m,
+                    "-"  = "hline",
+                    "|"  = "vline",
+                    "+"  = c("hline", "vline"),
+                    "/"  = "ldiag",
+                    "\\" = "rdiag",
+                    "x"  = c("ldiag", "rdiag"),
+                    "o"  = "circle_gap",
+                    "()" = "circle_full",
+                    "<>" = "diamond",
+                    "{}" = "octagon",
+                    stop(paste0("[Heatmap] Unknown mark type: '", m, "'"))
+                )
+            }
+            c(prims, inner)
+        }
+
+        # ── Vectorized primitive renderer ───────────────────────────────────
+        .draw_mark_prim <- function(prim, xv, yv, wv, hv, col, lwd) {
+            switch(prim,
+                rect = grid::grid.rect(
+                    x = xv, y = yv, width = wv, height = hv,
+                    gp = gpar(col = col, fill = NA, lwd = lwd)),
+
+                hline = grid::grid.segments(
+                    x0 = xv - wv * 0.5, y0 = yv,
+                    x1 = xv + wv * 0.5, y1 = yv,
+                    gp = gpar(col = col, lwd = lwd)),
+
+                vline = grid::grid.segments(
+                    x0 = xv, y0 = yv - hv * 0.5,
+                    x1 = xv, y1 = yv + hv * 0.5,
+                    gp = gpar(col = col, lwd = lwd)),
+
+                ldiag = grid::grid.segments(
+                    x0 = xv - wv * 0.5, y0 = yv - hv * 0.5,
+                    x1 = xv + wv * 0.5, y1 = yv + hv * 0.5,
+                    gp = gpar(col = col, lwd = lwd)),
+
+                rdiag = grid::grid.segments(
+                    x0 = xv - wv * 0.5, y0 = yv + hv * 0.5,
+                    x1 = xv + wv * 0.5, y1 = yv - hv * 0.5,
+                    gp = gpar(col = col, lwd = lwd)),
+
+                circle_gap = {
+                    .r_mm <- min(
+                        convertUnit(wv[1L], "mm", valueOnly = TRUE),
+                        convertUnit(hv[1L], "mm", valueOnly = TRUE)
+                    ) * 0.25
+                    grid::grid.circle(
+                        x = xv, y = yv,
+                        r = unit(.r_mm, "mm"),
+                        gp = gpar(col = col, fill = NA, lwd = lwd))
+                },
+
+                circle_full = {
+                    .theta  <- seq(0, 2 * pi, length.out = 65L)[seq_len(64L)]
+                    .cos_t  <- cos(.theta)
+                    .sin_t  <- sin(.theta)
+                    for (k in seq_along(xv)) {
+                        grid::grid.polygon(
+                            x = xv[k] + wv[k] * 0.5 * .cos_t,
+                            y = yv[k] + hv[k] * 0.5 * .sin_t,
+                            gp = gpar(
+                                col  = if (length(col) == 1L) col else col[k],
+                                fill = NA,
+                                lwd  = if (length(lwd) == 1L) lwd else lwd[k]))
+                    }
+                },
+
+                diamond = {
+                    n <- length(xv)
+                    hw <- wv * 0.5; hh <- hv * 0.5
+                    for (k in seq_len(n)) {
+                        grid::grid.polygon(
+                            x = grid::unit.c(xv[k], xv[k] + hw[k], xv[k], xv[k] - hw[k]),
+                            y = grid::unit.c(yv[k] + hh[k], yv[k], yv[k] - hh[k], yv[k]),
+                            gp = gpar(col = col[k], fill = NA, lwd = lwd[k]))
+                    }
+                },
+
+                # octagon: 4 sides on the cell edges, 4 small corner cuts (cut factor = 0.2)
+                # The corner cuts are closer to the actual corners than a regular octagon would be
+                octagon = {
+                    n  <- length(xv)
+                    hw <- wv * 0.5; hh <- hv * 0.5
+                    f  <- 0.5  # corner cut factor (0 = full rectangle, 0.5 = diamond)
+                    for (k in seq_len(n)) {
+                        cx <- xv[k]; cy <- yv[k]
+                        dx <- hw[k] * f; dy <- hh[k] * f
+                        grid::grid.polygon(
+                            x = grid::unit.c(
+                                cx - hw[k] + dx, cx + hw[k] - dx,  # top edge: left → right
+                                cx + hw[k],       cx + hw[k],       # right edge: top → bottom
+                                cx + hw[k] - dx, cx - hw[k] + dx,  # bottom edge: right → left
+                                cx - hw[k],       cx - hw[k]        # left edge: bottom → top
+                            ),
+                            y = grid::unit.c(
+                                cy + hh[k],       cy + hh[k],       # top edge
+                                cy + hh[k] - dy,  cy - hh[k] + dy,  # right edge
+                                cy - hh[k],       cy - hh[k],       # bottom edge
+                                cy - hh[k] + dy,  cy + hh[k] - dy   # left edge
+                            ),
+                            gp = gpar(col = col[k], fill = NA, lwd = lwd[k]))
+                    }
+                }
+            )
+        }
+
+        # ── Legend icon builder ─────────────────────────────────────────────
+        .mark_legend_icon <- function(mark_str, col, lwd) {
+            prims <- .parse_mark_type(mark_str)
+            function(x, y, w, h, fill) {
+                for (p in prims) {
+                    .draw_mark_prim(p, x, y, w, h, col, lwd)
+                }
+            }
+        }
+
+        # ── Pre-scan for label legend entries ───────────────────────────────
+        if (!identical(legend.position, "none")) {
+            lgnd_seen <- list()
+            for (ri in seq_len(nrow(hmargs$matrix))) {
+                for (ci in seq_len(ncol(hmargs$matrix))) {
+                    r <- .call_label(hmargs$matrix[ri, ci], ri, ci)
+                    if (is.list(r) && !is.null(r$legend) && !is.na(r$legend)) {
+                        key <- r$legend
+                        if (is.null(lgnd_seen[[key]])) {
+                            lbl_txt <- .extract_lbl(r)
+                            lgnd_seen[[key]] <- list(
+                                text  = if (!is.na(lbl_txt)) lbl_txt else key,
+                                color = r$color %||% label_color,
+                                order = r$order %||% NA_integer_
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (length(lgnd_seen) > 0) {
+                orders <- sapply(lgnd_seen, function(e) e$order %||% NA_integer_)
+                if (!all(is.na(orders))) {
+                    orders[is.na(orders)] <- max(orders, na.rm = TRUE) + seq_len(sum(is.na(orders)))
+                    lgnd_seen <- lgnd_seen[order(orders)]
+                }
+                lgnd_graphics <- lapply(lgnd_seen, function(entry) {
+                    txt <- entry$text
+                    col <- entry$color
+                    sz  <- label_size
+                    function(x, y, w, h, fill) {
+                        grid.text(txt, x, y, gp = gpar(fontsize = sz, col = col, fontface = "bold"))
+                    }
+                })
+                legends$.label <- ComplexHeatmap::Legend(
+                    title    = label_name,
+                    labels   = names(lgnd_seen),
+                    graphics = lgnd_graphics,
+                    direction = legend.direction
+                )
+            }
+
+            # ── Pre-scan for mark legend entries ─────────────────────────────
+            mkl_seen <- list()
+            for (ri in seq_len(nrow(hmargs$matrix))) {
+                for (ci in seq_len(ncol(hmargs$matrix))) {
+                    r <- .call_mark(hmargs$matrix[ri, ci], ri, ci)
+                    if (is.list(r) && !is.null(r$legend) && !is.na(r$legend)) {
+                        key <- r$legend
+                        if (is.null(mkl_seen[[key]])) {
+                            mk_str <- .extract_mark(r)
+                            mkl_seen[[key]] <- list(
+                                mark  = if (!is.na(mk_str)) mk_str else key,
+                                color = r$color %||% mark_color,
+                                size  = r$size  %||% mark_size,
+                                order = r$order %||% NA_integer_
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (length(mkl_seen) > 0) {
+                orders <- sapply(mkl_seen, function(e) e$order %||% NA_integer_)
+                if (!all(is.na(orders))) {
+                    orders[is.na(orders)] <- max(orders, na.rm = TRUE) + seq_len(sum(is.na(orders)))
+                    mkl_seen <- mkl_seen[order(orders)]
+                }
+                mkl_graphics <- lapply(mkl_seen, function(entry) {
+                    .mark_legend_icon(entry$mark, entry$color, entry$size)
+                })
+                legends$.mark <- ComplexHeatmap::Legend(
+                    title       = mark_name,
+                    labels      = names(mkl_seen),
+                    graphics    = mkl_graphics,
+                    direction   = legend.direction,
+                    row_gap     = unit(1, "mm")
+                )
+            }
+        }
+
+        # ── layer_fun: marks first (background), then labels (foreground) ───
+        hmargs$layer_fun <- function(j, i, x, y, w, h, fill, sr, sc) {
+            raw_vals <- ComplexHeatmap::pindex(hmargs$matrix, i, j)
+
+            # Draw marks
+            mk_results  <- lapply(seq_along(i), function(k) .call_mark(raw_vals[k], i[k], j[k]))
+            marks_vec   <- sapply(mk_results, .extract_mark)
+            mk_colors   <- sapply(mk_results, function(r) if (is.list(r)) r$color %||% mark_color else mark_color)
+            mk_sizes    <- sapply(mk_results, function(r) if (is.list(r)) r$size  %||% mark_size  else mark_size)
+
+            unique_marks <- unique(marks_vec[!is.na(marks_vec)])
+            for (mk in unique_marks) {
+                km   <- which(marks_vec == mk)
+                prms <- .parse_mark_type(mk)
+                for (prim in prms) {
+                    .draw_mark_prim(prim, x[km], y[km], w[km], h[km], mk_colors[km], mk_sizes[km])
+                }
+            }
+
+            # Draw labels on top
+            lbl_results <- lapply(seq_along(i), function(k) .call_label(raw_vals[k], i[k], j[k]))
+            lbl   <- sapply(lbl_results, .extract_lbl)
+            sizes  <- sapply(lbl_results, function(r) if (is.list(r)) r$size  %||% label_size else label_size)
+            colors <- sapply(lbl_results, function(r) if (is.list(r)) r$color %||% label_color else label_color)
+
+            inds <- which(!is.na(lbl))
+            if (length(inds) > 0) {
+                theta <- seq(pi / 8, 2 * pi, length.out = 16)
+                for (k in inds) {
+                    sz <- sizes[k]
+                    lapply(theta, function(a) {
+                        grid.text(lbl[k],
+                            x = x[k] + unit(cos(a) * sz / 30, "mm"),
+                            y = y[k] + unit(sin(a) * sz / 30, "mm"),
+                            gp = gpar(fontsize = sz, col = "white"))
+                    })
+                    grid.text(lbl[k], x[k], y[k], gp = gpar(fontsize = sz, col = colors[k]))
+                }
+            }
+
+            if (is.function(layer_fun_callback)) {
+                layer_fun_callback(j, i, x, y, w, h, fill, sr, sc)
+            }
+        }
+        legends$.heatmap <- get_main_legend()
     }
-    .nrows <- .nrows * nrow_multiplier
-    nrows <- ifelse(flip, .ncols, .nrows)
-    ncols <- ifelse(flip, .nrows, .ncols)
+
+    # Use actual matrix dimensions: split_by groups partition their axis items,
+    # they don't multiply them. hmargs$matrix is already transposed when flip=TRUE.
+    nrows <- nrow(hmargs$matrix)
+    ncols <- ncol(hmargs$matrix)
+
+    # ── Cell dimensions ──────────────────────────────────────────────────────
+    # cell_w / cell_h: width and height of one cell in the *non-flipped* orientation
+    # (inches).  cell_h = cell_w * effective_aspect_ratio.
+    # Defaults are chosen so embedded sub-plots (violin, boxplot, pie) have enough
+    # room, and bar cells are wider than they are tall.
+    cell_w <- switch(cell_type,
+        violin      = 0.5,
+        boxplot     = 0.5,
+        pie         = 0.5,
+        bars        = 0.35,
+        label       = 0.6,
+        mark        = 0.25,
+        `label+mark` = 0.6,
+        0.25  # tile, dot
+    )
+    cell_w <- cell_w * base_size
+
+    aspect.ratio <- aspect.ratio %||% switch(cell_type,
+        violin       = 2,    # taller to accommodate violin shape
+        boxplot      = 2,    # slightly taller to accommodate boxplot shape
+        pie          = 1,    # square for pie charts
+        bars         = 0.5,  # wider-than-tall for bars
+        label        = 0.6,  # shorter to fit text better
+        mark         = 1,    # square for marks
+        `label+mark` = 0.6,  # same as label
+        1       # square by default for all other types
+    )
+    cell_h <- cell_w * aspect.ratio
 
     ## Set up the top annotations
     setup_name_annos <- function(
-        names_side, anno_title, show_names, params, which,
-        split_by, splits, split_palette, split_palcolor,
-        by, by_name_annotation, by_labels, by_palette, by_palcolor, by_name_legend
+        names_side, anno_title, show_names, params, annotation_palette, annotation_palcolor, which,
+        split_by, splits,
+        by, by_labels
     ) {
         annos <- list(
             annotation_name_side = names_side,
             show_annotation_name = list()
         )
         if (!is.null(split_by)) {
-            param <- params[[paste0("name.", split_by)]] %||% list()
-            param$x <- splits
-            param$title <- split_by
-            param$palette <- split_palette
-            param$palcolor <- split_palcolor
-            param$border <- param$border %||% TRUE
-            param$legend.direction <- legend.direction
-            param$which <- ifelse(flip, setdiff(c("column", "row"), which), which)
-            param$show_legend <- is.null(anno_title) && !identical(legend.position, "none")
-            worh <- ifelse(param$which == "row", "width", "height")
-            param[[worh]] <- param[[worh]] %||% unit(2.5, "mm")
-            if (is.numeric(param[[worh]]) && !is.unit(param[[worh]])) {
-                param[[worh]] <- unit(param[[worh]], "mm")
-            }
+            param <- params[[split_by]] %||% list()
+            if (isFALSE(param)) {
+                annos[[split_by]] <- NULL
+            } else {
+                param$x <- splits
+                param$title <- split_by
+                split_pal <- if (is.list(annotation_palette)) annotation_palette[[split_by]] else NULL
+                split_palcol <- if (is.list(annotation_palcolor)) annotation_palcolor[[split_by]] else NULL
+                param$palette <- split_pal %||% param$palette %||% "simspec"
+                param$palcolor <- split_palcol %||% param$palcolor
+                param$border <- param$border %||% TRUE
+                param$legend.direction <- legend.direction
+                param$which <- ifelse(flip, setdiff(c("column", "row"), which), which)
+                param$show_legend <- is.null(anno_title) && !identical(legend.position, "none")
+                worh <- ifelse(param$which == "row", "width", "height")
+                param[[worh]] <- param[[worh]] %||% unit(2.5, "mm")
+                if (is.numeric(param[[worh]]) && !is.unit(param[[worh]])) {
+                    param[[worh]] <- unit(param[[worh]], "mm")
+                }
+                annos$show_annotation_name[[split_by]] <- TRUE
+                anno_legend <- do.call(anno_simple, param)
+                annos[[split_by]] <- anno_legend$anno
 
-
-            annos$show_annotation_name[[split_by]] <- TRUE
-            anno_legend <- do.call(anno_simple, param)
-            annos[[split_by]] <- anno_legend$anno
-            if (isTRUE(param$show_legend)) {
-                legends[[paste0("name.", split_by)]] <<- anno_legend$legend
+                if (isTRUE(param$show_legend)) {
+                    legends[[split_by]] <<- anno_legend$legend
+                }
             }
         }
 
-        if (!is.null(by) && by_name_annotation) {
-            param <- params[[paste0("name.", by)]] %||% list()
-            param$x <- by_labels
-            param$title <- by
-            param$palette <- by_palette
-            param$palcolor <- by_palcolor
-            param$border <- param$border %||% TRUE
-            param$legend.direction <- legend.direction
-            param$which <- ifelse(flip, setdiff(c("column", "row"), which), which)
-            param$show_legend <- !identical(legend.position, "none") &&
-                (isTRUE(by_name_legend) || (is.null(by_name_legend) && !show_names))
-            worh <- ifelse(param$which == "row", "width", "height")
-            param[[worh]] <- param[[worh]] %||% unit(2.5, "mm")
-            if (is.numeric(param[[worh]]) && !is.unit(param[[worh]])) {
-                param[[worh]] <- unit(param[[worh]], "mm")
-            }
+        by_name_annotation <- !is.null(by) && !isFALSE(params[[by]] %||% TRUE)
+        if (by_name_annotation) {
+            param <- params[[by]] %||% list()
+            by_name_legend <- param$show_legend
+            if (isFALSE(param)) {
+                annos[[by]] <- NULL
+                return(annos)
+            } else {
+                param$x <- by_labels
+                param$title <- by
+                by_pal <- if (is.list(annotation_palette)) annotation_palette[[by]] else NULL
+                by_palcol <- if (is.list(annotation_palcolor)) annotation_palcolor[[by]] else NULL
+                param$palette <- by_pal %||% param$palette %||% "Paired"
+                param$palcolor <- by_palcol %||% param$palcolor
+                param$border <- param$border %||% TRUE
+                param$legend.direction <- legend.direction
+                param$which <- ifelse(flip, setdiff(c("column", "row"), which), which)
+                param$show_legend <- !identical(legend.position, "none") &&
+                    (isTRUE(by_name_legend) || (is.null(by_name_legend) && !show_names))
+                worh <- ifelse(param$which == "row", "width", "height")
+                param[[worh]] <- param[[worh]] %||% unit(2.5, "mm")
+                if (is.numeric(param[[worh]]) && !is.unit(param[[worh]])) {
+                    param[[worh]] <- unit(param[[worh]], "mm")
+                }
 
-            annos$show_annotation_name[[by]] <- TRUE
-            anno_legend <- do.call(anno_simple, param)
-            annos[[by]] <- anno_legend$anno
-            if (isTRUE(param$show_legend)) {
-                legends[[paste0("name.", by)]] <<- anno_legend$legend
+                annos$show_annotation_name[[by]] <- TRUE
+                anno_legend <- do.call(anno_simple, param)
+                annos[[by]] <- anno_legend$anno
+                if (isTRUE(param$show_legend)) {
+                    legends[[by]] <<- anno_legend$legend
+                }
             }
         }
 
@@ -1828,6 +2627,13 @@ HeatmapAtomic <- function(
             param$palette <- annotation_palette[[aname]] %||% "Paired"
             param$palcolor <- annotation_palcolor[[aname]]
             param$legend.direction <- legend.direction
+            if (annotype == "simple") {
+                worh <- ifelse(param$which == "row", "width", "height")
+                param[[worh]] <- param[[worh]] %||% unit(2.5, "mm")
+                if (is.numeric(param[[worh]]) && !inherits(param[[worh]], "unit")) {
+                    param[[worh]] <- unit(param[[worh]], "mm")
+                }
+            }
             # swap width and height if flip is TRUE
             if (flip) {
                 pheight <- param$height
@@ -1854,16 +2660,16 @@ HeatmapAtomic <- function(
 
     ncol_annos <- sum(cluster_columns, show_column_names) * 4
     ncol_annos <- ncol_annos +
-        ifelse(is.null(columns_split_by), 0, 1) +
-        ifelse(is.null(columns_by) || !column_name_annotation, 0, 1)
+        ifelse(is.null(columns_split_by) || isFALSE(column_annotation_params[[columns_split_by]]), 0, 1) +
+        ifelse(!col_name_anno_enabled, 0, 1)
     top_annos <- setup_name_annos(
         names_side = ifelse(flip, column_names_side, row_names_side), anno_title = column_title,
-        show_names = show_column_names, params = column_annotation_params, which = "column",
+        show_names = show_column_names, params = column_annotation_params,
+        annotation_palette = column_annotation_palette, annotation_palcolor = column_annotation_palcolor,
+        which = "column",
         split_by = columns_split_by, splits = if (flip) hmargs$row_split else hmargs$column_split,
-        split_palette = columns_split_palette, split_palcolor = columns_split_palcolor,
-        by = columns_by, by_name_annotation = column_name_annotation,
-        by_labels = if (flip) hmargs$row_labels else hmargs$column_labels, by_palette = columns_palette,
-        by_palcolor = columns_palcolor, by_name_legend = column_name_legend
+        by = columns_by,
+        by_labels = if (flip) hmargs$row_labels else hmargs$column_labels
     )
     column_annos <- setup_annos(
         which = "column", names_side = ifelse(flip, column_names_side, row_names_side),
@@ -1884,7 +2690,7 @@ HeatmapAtomic <- function(
         }
         rm(column_annos)
     }
-    if (length(top_annos$show_annotation_name) > 0) {
+    if (any(sapply(top_annos, inherits, "AnnotationFunction"))) {
         if (isTRUE(flip)) {
             hmargs$left_annotation <- do.call(ComplexHeatmap::rowAnnotation, top_annos)
         } else {
@@ -1895,16 +2701,16 @@ HeatmapAtomic <- function(
 
     nrow_annos <- sum(cluster_rows, show_row_names) * 4
     nrow_annos <- nrow_annos +
-        ifelse(is.null(rows_split_by), 0, 1) +
-        ifelse(is.null(rows_by) || !row_name_annotation, 0, 1)
+        ifelse(is.null(rows_split_by) || isFALSE(row_annotation_params[[rows_split_by]]), 0, 1) +
+        ifelse(!row_name_anno_enabled, 0, 1)
     left_annos <- setup_name_annos(
         names_side = ifelse(flip, row_names_side, column_names_side), anno_title = row_title,
-        show_names = show_row_names, params = row_annotation_params, which = "row",
+        show_names = show_row_names, params = row_annotation_params,
+        annotation_palette = row_annotation_palette, annotation_palcolor = row_annotation_palcolor,
+        which = "row",
         split_by = rows_split_by, splits = if (flip) hmargs$column_split else hmargs$row_split,
-        split_palette = rows_split_palette, split_palcolor = rows_split_palcolor,
-        by = rows_by, by_name_annotation = row_name_annotation,
-        by_labels = if (flip) hmargs$column_labels else hmargs$row_labels,
-        by_palette = rows_palette, by_palcolor = rows_palcolor, by_name_legend = row_name_legend
+        by = rows_by,
+        by_labels = if (flip) hmargs$column_labels else hmargs$row_labels
     )
     row_annos <- setup_annos(
         which = "row", names_side = ifelse(flip, row_names_side, column_names_side),
@@ -1925,7 +2731,7 @@ HeatmapAtomic <- function(
         }
         rm(row_annos)
     }
-    if (length(left_annos$show_annotation_name) > 0) {
+    if (any(sapply(left_annos, inherits, "AnnotationFunction"))) {
         if (isTRUE(flip)) {
             hmargs$top_annotation <- do.call(ComplexHeatmap::HeatmapAnnotation, left_annos)
         } else {
@@ -1933,6 +2739,58 @@ HeatmapAtomic <- function(
         }
     }
     rm(left_annos)
+
+    ## Fix for ComplexHeatmap annotation name / legend overlap bug:
+    ## When show_row_names = FALSE but annotations have names on the right side
+    ## (annotation_name_side = "right"), ComplexHeatmap does not allocate space for those
+    ## annotation name labels, causing them to overlap the right-side legend.
+    ## - flip = FALSE: column annotations (top_annotation) have names on row_names_side = "right"
+    ## - flip = TRUE:  row annotations (top_annotation, from left_annos) have names on
+    ##                 row_names_side = "right"; hmargs$row_names_side = flip_side(column_names_side)
+    ## In both cases the offending names appear on the right, so inject a phantom invisible
+    ## right annotation to reserve the required width.
+    phantom_right_width_in <- 0
+    if (!isTRUE(hmargs$show_row_names) &&
+        hmargs$row_names_side == "right" &&
+        legend.position == "right") {
+        right_anno_names <- character(0)
+        if (!isTRUE(flip)) {
+            if (col_name_anno_enabled && !is.null(columns_by)) {
+                right_anno_names <- c(right_anno_names, columns_by)
+            }
+            if (!is.null(columns_split_by) && !isFALSE(column_annotation_params[[columns_split_by]])) {
+                right_anno_names <- c(right_anno_names, columns_split_by)
+            }
+            if (!is.null(column_annotation) && length(column_annotation) > 0) {
+                col_anno_names <- if (is.list(column_annotation)) names(column_annotation) else as.character(column_annotation)
+                right_anno_names <- c(right_anno_names, col_anno_names)
+            }
+        } else {
+            if (row_name_anno_enabled && !is.null(rows_by)) {
+                right_anno_names <- c(right_anno_names, rows_by)
+            }
+            if (!is.null(rows_split_by) && !isFALSE(row_annotation_params[[rows_split_by]])) {
+                right_anno_names <- c(right_anno_names, rows_split_by)
+            }
+            if (!is.null(row_annotation) && length(row_annotation) > 0) {
+                row_anno_names <- if (is.list(row_annotation)) names(row_annotation) else as.character(row_annotation)
+                right_anno_names <- c(right_anno_names, row_anno_names)
+            }
+        }
+        if (length(right_anno_names) > 0) {
+            phantom_width <- ComplexHeatmap::max_text_width(right_anno_names)
+            phantom_right_width_in <- convertUnit(phantom_width, "inches", valueOnly = TRUE)
+            phantom_anno <- ComplexHeatmap::rowAnnotation(
+                .gap = ComplexHeatmap::anno_empty(border = FALSE, width = phantom_width),
+                show_annotation_name = FALSE
+            )
+            if (is.null(hmargs$right_annotation)) {
+                hmargs$right_annotation <- phantom_anno
+            } else {
+                hmargs$right_annotation <- hmargs$right_annotation + phantom_anno
+            }
+        }
+    }
 
     ## Set up the heatmap dimensions
     # Row names appear on left/right and add to width; only count when show_row_names is TRUE.
@@ -1969,28 +2827,16 @@ HeatmapAtomic <- function(
     # We strip out the show_*_names contribution (already captured by rownames_width /
     # colnames_height above) and reduce the per-item coefficient to avoid double-counting.
     row_overhead <- (if (isTRUE(cluster_rows))    0.5 else 0) +
-                    (nrow_annos - show_row_names * 4) * 0.15
+                    (nrow_annos - show_row_names * 4) * 0.15 + phantom_right_width_in
     col_overhead <- (if (isTRUE(cluster_columns)) 0.5 else 0) +
                     (ncol_annos - show_column_names * 4) * 0.15 + colnames_height
 
-    if (getOption("plotthis.dimcalc.enabled", TRUE)) {
-        # Cap the cell body to prevent runaway sizes for large heatmaps
-        max_body <- 8
-        if (isTRUE(flip)) {
-            body_width  <- min(nrows * 0.25, max_body)
-            body_height <- min(ncols * 0.25, max_body)
-        } else {
-            body_width  <- min(ncols * 0.25, max_body)
-            body_height <- min(nrows * 0.25, max_body)
-        }
+    if (isTRUE(flip)) {
+        body_width  <- ncols * cell_h
+        body_height <- nrows * cell_w
     } else {
-        if (isTRUE(flip)) {
-            body_width  <- nrows * 0.25
-            body_height <- ncols * 0.25
-        } else {
-            body_width  <- ncols * 0.25
-            body_height <- nrows * 0.25
-        }
+        body_width  <- ncols * cell_w
+        body_height <- nrows * cell_h
     }
 
     padding <- if (inherits(padding, "unit")) padding else unit(padding, "mm")
@@ -2015,12 +2861,6 @@ HeatmapAtomic <- function(
     padding <- padding[c(3, 4, 1, 2)]
 
 
-    if (cell_type == "pie") {
-        sq <- max(width, height)
-        width  <- sq
-        height <- sq
-    }
-
     # ── Precise legend size contribution (mirrors calculate_plot_dimensions) ──
     # Collect all candidate legend label strings to estimate max label width.
     # Sources:
@@ -2041,12 +2881,12 @@ HeatmapAtomic <- function(
         as.character(if (is.factor(data[[col]])) levels(data[[col]]) else unique(data[[col]]))
     }
     # Name-annotation legends:
-    #   – rows_by shows a legend when show_row_names=FALSE (and row_name_annotation=TRUE)
-    #   – columns_by shows a legend when show_column_names=FALSE (and column_name_annotation=TRUE)
+    #   – rows_by shows a legend when show_row_names=FALSE (and row name annotation is enabled)
+    #   – columns_by shows a legend when show_column_names=FALSE (and col name annotation is enabled)
     #   – split_by annotations always show legends when present
-    if (!isTRUE(show_row_names) && isTRUE(row_name_annotation))
+    if (!isTRUE(show_row_names) && row_name_anno_enabled)
         .legend_label_cands <- c(.legend_label_cands, .col_labels(rows_by))
-    if (!isTRUE(show_column_names) && isTRUE(column_name_annotation))
+    if (!isTRUE(show_column_names) && col_name_anno_enabled)
         .legend_label_cands <- c(.legend_label_cands, .col_labels(columns_by))
     .legend_label_cands <- c(.legend_label_cands,
         .col_labels(rows_split_by),
@@ -2091,6 +2931,15 @@ HeatmapAtomic <- function(
             width <- width + legend_width
         }
     }
+    # Fix body dimensions so ComplexHeatmap honours aspect.ratio regardless of canvas size.
+    # Only set when the caller has not already provided explicit width/height via `...`.
+    # Do NOT set the width and height so that the plot won't be truncated due to the device size limit; instead, we will set the width and height attributes on the returned object so that the downstream display method can choose how to handle it (e.g. scaling to fit the device).
+    # if (is.null(hmargs$width)) {
+    #     hmargs$width  <- unit(body_width,  "inches")
+    # }
+    # if (is.null(hmargs$height)) {
+    #     hmargs$height <- unit(body_height, "inches")
+    # }
     unknown_args <- setdiff(names(hmargs), methods::formalArgs(ComplexHeatmap::Heatmap))
     if (length(unknown_args) > 0) {
         warning("[Heatmap] Unknown arguments to ComplexHeatmap::Heatmap(): ",
@@ -2099,25 +2948,38 @@ HeatmapAtomic <- function(
     }
     p <- do.call(ComplexHeatmap::Heatmap, hmargs)
     mat <- p@matrix
+    # Move label/mark legends to the end so they appear last
+    if (!is.null(legends$.label)) {
+        legends <- c(legends[names(legends) != ".label"], legends[".label"])
+    }
+    if (!is.null(legends$.mark)) {
+        legends <- c(legends[names(legends) != ".mark"], legends[".mark"])
+    }
+    draw_args_fixed <- list(
+        annotation_legend_list = legends,
+        padding = draw_opts$padding %||% padding,
+        column_title = title,
+        align_heatmap_legend = draw_opts$align_heatmap_legend %||% "heatmap_center",
+        align_annotation_legend = draw_opts$align_annotation_legend %||% "heatmap_center"
+    )
+    if (identical(legend.position, "none")) {
+        draw_args_fixed$show_annotation_legend <- draw_opts$show_annotation_legend %||% FALSE
+        draw_args_fixed$show_heatmap_legend <- draw_opts$show_heatmap_legend %||% FALSE
+    } else {
+        draw_args_fixed$annotation_legend_side <- draw_opts$annotation_legend_side %||% legend.position
+        draw_args_fixed$heatmap_legend_side <- draw_opts$heatmap_legend_side %||% legend.position
+    }
+    draw_args <- utils::modifyList(draw_opts, draw_args_fixed)
+
     if (isTRUE(return_grob)) {
-        if (identical(legend.position, "none")) {
-            p <- grid.grabExpr(ComplexHeatmap::draw(p,
-                annotation_legend_list = legends,
-                padding = padding,
-                show_annotation_legend = FALSE, column_title = title
-            ))
-        } else {
-            p <- grid.grabExpr(ComplexHeatmap::draw(p,
-                annotation_legend_list = legends,
-                padding = padding,
-                annotation_legend_side = legend.position, column_title = title
-            ))
-        }
+        p <- grid::grid.grabExpr(do.call(ComplexHeatmap::draw, c(list(p), draw_args)))
     } else {
         # When return_grob = FALSE (ggplot2 v4), ComplexHeatmap::draw() will render
         # to the graphics device. To prevent unwanted output during assignment while
         # still allowing proper display when explicitly printed, we capture to a
         # null device first, then return the HeatmapList which can be drawn later.
+        # Size the null device to the full computed dimensions so ComplexHeatmap
+        # builds layout at the right proportions.
         current_dev <- grDevices::dev.cur()
         null_dev <- grDevices::pdf(NULL)
         on.exit({
@@ -2127,23 +2989,30 @@ HeatmapAtomic <- function(
             }
         }, add = TRUE)
 
-        if (identical(legend.position, "none")) {
-            p <- ComplexHeatmap::draw(p,
-                annotation_legend_list = legends,
-                padding = padding,
-                show_annotation_legend = FALSE, column_title = title
-            )
-        } else {
-            p <- ComplexHeatmap::draw(p,
-                annotation_legend_list = legends,
-                padding = padding,
-                annotation_legend_side = legend.position, column_title = title
-            )
+        p <- do.call(ComplexHeatmap::draw, c(list(p), draw_args))
+    }
+
+    min_size_in <- 4
+    max_size_in <- 64
+    attr(p, "height") <- max(min(height, max_size_in), min_size_in)
+    attr(p, "width") <- max(min(width, max_size_in), min_size_in)
+
+    # keep the ratio
+    ratio <- height / width
+    if (ratio > 1) {
+        if (attr(p, "height") == max_size_in) {
+            attr(p, "width") <- attr(p, "height") / ratio
+        } else if (attr(p, "width") == min_size_in) {
+            attr(p, "height") <- attr(p, "width") * ratio
+        }
+    } else if (ratio < 1) {
+        if (attr(p, "width") == max_size_in) {
+            attr(p, "height") <- attr(p, "width") * ratio
+        } else if (attr(p, "height") == min_size_in) {
+            attr(p, "width") <- attr(p, "height") / ratio
         }
     }
 
-    attr(p, "height") <- max(min(height, 15), 4)
-    attr(p, "width") <- max(min(width, 15), 4)
     attr(p, "data") <- mat
     p
 }
@@ -2211,6 +3080,7 @@ HeatmapAtomic <- function(
 #'     # add labels to the heatmap
 #'     Heatmap(matrix_data, rows_data = rows_data,
 #'         rows_split_by = "group", cell_type = "label",
+#'         base_size = 0.8,
 #'         label = function(x) ifelse(
 #'             x > 0, scales::number(x, accuracy = 0.01), NA
 #'         )
@@ -2221,6 +3091,7 @@ HeatmapAtomic <- function(
 #'     pvalues <- matrix(runif(60, 0, 0.5), nrow = 6, ncol = 10)
 #'     Heatmap(matrix_data, rows_data = rows_data,
 #'         rows_split_by = "group", cell_type = "label",
+#'         base_size = 0.8,
 #'         label = function(x, i, j) {
 #'             pv <- ComplexHeatmap::pindex(pvalues, i, j)
 #'             ifelse(pv < 0.01, "***",
@@ -2230,14 +3101,67 @@ HeatmapAtomic <- function(
 #'     )
 #' }
 #' if (requireNamespace("cluster", quietly = TRUE)) {
+#'     # Set label color, size, legend and order
+#'     pvalues <- matrix(runif(60, 0, 0.5), nrow = 6, ncol = 10)
+#'     Heatmap(matrix_data, rows_data = rows_data,
+#'         rows_split_by = "group", cell_type = "label",
+#'         base_size = 0.6,
+#'         label_name = "Significance",
+#'         label = function(x, i, j) {
+#'             pv <- ComplexHeatmap::pindex(pvalues, i, j)
+#'             if (pv < 0.01)
+#'                list("***", color = "red", size = 12, legend = "p < 0.01", order = 1)
+#'             else if (pv < 0.05)
+#'                list("**", color = "orange", size = 10, legend = "p < 0.05", order = 3)
+#'             else if (pv < 0.1)
+#'                list("*", color = "yellow", size = 8, legend = "p < 0.1", order = 2)
+#'             else NA
+#'         }
+#'     )
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
+#'     # add marks
+#'     Heatmap(matrix_data, rows_data = rows_data,
+#'         rows_split_by = "group", cell_type = "mark",
+#'         mark = function(x, i, j) {
+#'             pv <- ComplexHeatmap::pindex(pvalues, i, j)
+#'             if(pv < 0.01) list("[x]", legend = "p < 0.01")
+#'             else if (pv < 0.02) list("[o]", legend = "p < 0.02")
+#'             else if (pv < 0.03) list("[-]", legend = "p < 0.03")
+#'             else if (pv < 0.05) list("[()]", legend = "p < 0.05")
+#'             else if (pv < 0.06) list("+", legend = "p < 0.06")
+#'             else if (pv < 0.07) list("x", legend = "p < 0.07")
+#'             else if (pv < 0.08) list("[/]", legend = "p < 0.08")
+#'             else if (pv < 0.09) list("[\\]", legend = "p < 0.09")
+#'             else NA
+#'         }
+#'     )
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
+#'     # add labels and marks
+#'     Heatmap(matrix_data, rows_data = rows_data,
+#'         rows_split_by = "group", cell_type = "mark+label",
+#'         label = scales::label_number(accuracy = 0.01),
+#'         mark = function(x, i, j) {
+#'             pv <- ComplexHeatmap::pindex(pvalues, i, j)
+#'             if(pv < 0.01) list("{}", legend = "p < 0.01")
+#'             else if(pv < 0.05) list("[]", legend = "p < 0.05")
+#'             else NA
+#'         },
+#'         mark_size = 1.5, mark_color = "red"
+#'     )
+#' }
+#' if (requireNamespace("cluster", quietly = TRUE)) {
 #'     # quickly simulate a GO board
 #'     go <- matrix(sample(c(0, 1, NA), 81, replace = TRUE), ncol = 9)
 #'
 #'     Heatmap(
 #'         go,
-#'         # Do not cluster rows and columns and hide the annotations
+#'         # Do not cluster rows and columns and hide the name annotations
+#'         # Use .row/.col aliases (or the actual rows_name/columns_name) in annotation_params
 #'         cluster_rows = FALSE, cluster_columns = FALSE,
-#'         row_name_annotation = FALSE, column_name_annotation = FALSE,
+#'         row_annotation_params = list(.row = FALSE),
+#'         column_annotation_params = list(.col = FALSE),
 #'         show_row_names = FALSE, show_column_names = FALSE,
 #'         # Set the legend items
 #'         values_by = "Players", legend_discrete = TRUE,
@@ -2252,11 +3176,10 @@ HeatmapAtomic <- function(
 #'         width = ggplot2::unit(105, "mm"), height = ggplot2::unit(105, "mm"))
 #' }
 #' if (requireNamespace("cluster", quietly = TRUE)) {
-#'     # Make the row/column name annotation thicker
+#'     # Make the row/column name annotation thicker using the .row/.col aliases
 #'     Heatmap(matrix_data,
-#'         # Use the "name." prefix
-#'         column_annotation_params = list(name.columns = list(height = 5)),
-#'         row_annotation_params = list(name.rows = list(width = 5)))
+#'         column_annotation_params = list(.col = list(height = 5)),
+#'         row_annotation_params = list(.row = list(width = 5)))
 #' }
 #'
 #' # Use long form data
@@ -2365,15 +3288,15 @@ Heatmap <- function(
     rows_name = NULL, rows_split_name = NULL,
     # palettes
     palette = "RdBu", palcolor = NULL,
-    rows_palette = "Paired", rows_palcolor = NULL, rows_split_palette = "simspec", rows_split_palcolor = NULL,
-    columns_palette = "Paired", columns_palcolor = NULL, columns_split_palette = "simspec", columns_split_palcolor = NULL,
     # cell_type: pies
     pie_size_name = "size", pie_size = NULL, pie_values = "length", pie_name = NULL,
     pie_group_by = NULL, pie_group_by_sep = "_", pie_palette = "Spectral", pie_palcolor = NULL,
     # cell_type: bars
     bars_sample = 100,
     # cell_type: label
-    label = identity, label_size = 10,
+    label = identity, label_size = 10, label_color = "black", label_name = "label",
+    # cell_type: mark
+    mark = identity, mark_color = "black", mark_size = 1, mark_name = "mark",
     # cell_type: violin
     violin_fill = NULL,
     # cell_type: boxplot
@@ -2390,9 +3313,7 @@ Heatmap <- function(
     # reticle
     add_reticle = FALSE, reticle_color = "grey",
     # passed to ComplexHeatmap::Heatmap
-    column_name_annotation = TRUE, column_name_legend = NULL,
-    row_name_annotation = TRUE, row_name_legend = NULL,
-    cluster_columns = NULL, cluster_rows = NULL, show_row_names = !row_name_annotation, show_column_names = !column_name_annotation,
+    cluster_columns = NULL, cluster_rows = NULL, show_row_names = NULL, show_column_names = NULL,
     border = TRUE, title = NULL, column_title = character(0), row_title = character(0), na_col = "grey85",
     row_names_side = "right", column_names_side = "bottom",
     column_annotation = NULL, column_annotation_side = "top", column_annotation_palette = "Paired", column_annotation_palcolor = NULL,
@@ -2400,9 +3321,9 @@ Heatmap <- function(
     row_annotation = NULL, row_annotation_side = "left", row_annotation_palette = "Paired", row_annotation_palcolor = NULL,
     row_annotation_type = "auto", row_annotation_params = list(), row_annotation_agg = NULL,
     # misc
-    flip = FALSE, alpha = 1, seed = 8525, padding = 15,
+    flip = FALSE, alpha = 1, seed = 8525, padding = 15, base_size = 1, aspect.ratio = NULL, draw_opts = list(),
     # cell customization
-    layer_fun_callback = NULL, cell_type = c("tile", "bars", "label", "dot", "violin", "boxplot", "pie"), cell_agg = NULL,
+    layer_fun_callback = NULL, cell_type = c("tile", "bars", "label", "mark", "label+mark", "mark+label", "dot", "violin", "boxplot", "pie"), cell_agg = NULL,
     # subplots
     combine = TRUE, nrow = NULL, ncol = NULL, byrow = TRUE, axes = NULL, axis_titles = axes, guides = NULL, design = NULL,
     ...
@@ -2410,6 +3331,7 @@ Heatmap <- function(
     validate_common_args(seed)
     in_form <- match.arg(in_form)
     cell_type <- match.arg(cell_type)
+    cell_type <- sub("mark+label", "label+mark", cell_type, fixed = TRUE)
 
     if (!is.null(rows_orderby)) {
         cluster_rows <- cluster_rows %||% FALSE
@@ -2438,14 +3360,6 @@ Heatmap <- function(
 
     palette <- check_palette(palette, names(hmdata$data))
     palcolor <- check_palcolor(palcolor, names(hmdata$data))
-    rows_palette <- check_palette(rows_palette, names(hmdata$data))
-    rows_palcolor <- check_palcolor(rows_palcolor, names(hmdata$data))
-    rows_split_palette <- check_palette(rows_split_palette, names(hmdata$data))
-    rows_split_palcolor <- check_palcolor(rows_split_palcolor, names(hmdata$data))
-    columns_palette <- check_palette(columns_palette, names(hmdata$data))
-    columns_palcolor <- check_palcolor(columns_palcolor, names(hmdata$data))
-    columns_split_palette <- check_palette(columns_split_palette, names(hmdata$data))
-    columns_split_palcolor <- check_palcolor(columns_split_palcolor, names(hmdata$data))
     pie_palette <- check_palette(pie_palette, names(hmdata$data))
     pie_palcolor <- check_palcolor(pie_palcolor, names(hmdata$data))
     legend.direction <- check_legend(legend.direction, names(hmdata$data), "legend.direction")
@@ -2469,16 +3383,13 @@ Heatmap <- function(
                 columns_by = hmdata$columns_by, columns_split_by = hmdata$columns_split_by,
 
                 palette = palette[[nm]], palcolor = palcolor[[nm]],
-                rows_palette = rows_palette[[nm]], rows_palcolor = rows_palcolor[[nm]],
-                rows_split_palette = rows_split_palette[[nm]], rows_split_palcolor = rows_split_palcolor[[nm]],
-                columns_palette = columns_palette[[nm]], columns_palcolor = columns_palcolor[[nm]],
-                columns_split_palette = columns_split_palette[[nm]], columns_split_palcolor = columns_split_palcolor[[nm]],
 
                 pie_size_name = pie_size_name, pie_size = pie_size, pie_values = pie_values,
                 pie_group_by = hmdata$pie_group_by, pie_palette = pie_palette[[nm]], pie_palcolor = pie_palcolor[[nm]],
 
                 bars_sample = bars_sample,
-                label = label, label_size = label_size,
+                label = label, label_size = label_size, label_color = label_color, label_name = label_name,
+                mark = mark, mark_color = mark_color, mark_size = mark_size, mark_name = mark_name,
                 violin_fill = violin_fill,
                 boxplot_fill = boxplot_fill,
                 dot_size = dot_size, dot_size_name = dot_size_name,
@@ -2493,8 +3404,6 @@ Heatmap <- function(
 
                 add_reticle = add_reticle, reticle_color = reticle_color,
 
-                column_name_annotation = column_name_annotation, column_name_legend = column_name_legend,
-                row_name_annotation = row_name_annotation, row_name_legend = row_name_legend,
                 cluster_columns = cluster_columns, cluster_rows = cluster_rows, show_row_names = show_row_names, show_column_names = show_column_names,
                 border = border, title = title, column_title = column_title, row_title = row_title, na_col = na_col,
                 row_names_side = row_names_side, column_names_side = column_names_side,
@@ -2507,7 +3416,7 @@ Heatmap <- function(
                 row_annotation_type = row_annotation_type, row_annotation_params = row_annotation_params,
                 row_annotation_agg = row_annotation_agg,
 
-                flip = flip, alpha = alpha, seed = seed, return_grob = return_grob,
+                flip = flip, alpha = alpha, seed = seed, return_grob = return_grob, base_size = base_size, aspect.ratio = aspect.ratio, draw_opts = draw_opts,
                 layer_fun_callback = layer_fun_callback, cell_type = cell_type, cell_agg = cell_agg,
 
                 ...
